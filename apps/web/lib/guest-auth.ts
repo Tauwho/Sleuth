@@ -17,7 +17,7 @@ export type GuestAuthMode = "fixture" | "supabase";
 /** Who is using this browser, for the header: no session yet, a guest, or a team account. */
 export type ReviewerKind = "visitor" | "guest" | "team";
 
-export type GuestAuthErrorCode = "not_configured" | "anonymous_disabled" | "network" | "failed";
+export type GuestAuthErrorCode = "not_configured" | "anonymous_disabled" | "network" | "failed" | "captcha";
 
 /** Plain messages for people. Each says that nothing was created and how to go on. */
 export const GUEST_AUTH_MESSAGES: Record<GuestAuthErrorCode, string> = {
@@ -27,6 +27,7 @@ export const GUEST_AUTH_MESSAGES: Record<GuestAuthErrorCode, string> = {
     "Guest sign-in is turned off on this site, so nothing was created. The demo still works read-only.",
   network: "Could not reach the sign-in service, so nothing was created. Check your connection and try again.",
   failed: "Guest sign-in did not work, so nothing was created. Try again.",
+  captcha: "The quick human check did not pass, so nothing was created. Try again.",
 };
 
 export class GuestAuthError extends Error {
@@ -40,7 +41,9 @@ export class GuestAuthError extends Error {
 export interface GuestAuthPort {
   getSession(): Promise<{ data: { session: unknown }; error: unknown }>;
   getUser(): Promise<{ data: { user: unknown }; error: unknown }>;
-  signInAnonymously(): Promise<{ data: { session: unknown }; error: unknown }>;
+  signInAnonymously(credentials?: {
+    options?: { captchaToken?: string };
+  }): Promise<{ data: { session: unknown }; error: unknown }>;
   signOut(options: { scope: "local" }): Promise<{ error: unknown }>;
 }
 
@@ -115,6 +118,7 @@ function signInError(error: unknown): GuestAuthError {
   const e = shape(error);
   if (isNetworkError(error)) return new GuestAuthError("network");
   const text = typeof e.message === "string" ? e.message.toLowerCase() : "";
+  if (e.code === "captcha_failed" || text.includes("captcha")) return new GuestAuthError("captcha");
   if (e.code === "anonymous_provider_disabled" || text.includes("anonymous sign-ins are disabled")) {
     return new GuestAuthError("anonymous_disabled");
   }
@@ -137,7 +141,14 @@ export function createFixtureGuestAuth(): GuestAuth {
  * Supabase mode. `getPort` is called lazily, on the first use, so building this object does
  * nothing on the network. Pass `null` when the public Supabase settings are missing.
  */
-export function createGuestAuth(getPort: (() => GuestAuthPort) | null): GuestAuth {
+/**
+ * `getCaptchaToken`, when given, supplies a fresh Turnstile token for each guest sign-in (step 6),
+ * for a Supabase project with CAPTCHA protection on. Without it, sign-in sends no token.
+ */
+export function createGuestAuth(
+  getPort: (() => GuestAuthPort) | null,
+  getCaptchaToken?: () => Promise<string>,
+): GuestAuth {
   let port: GuestAuthPort | undefined;
   let inflight: Promise<void> | undefined;
   const auth = (): GuestAuthPort => {
@@ -146,9 +157,19 @@ export function createGuestAuth(getPort: (() => GuestAuthPort) | null): GuestAut
   };
 
   async function signIn(): Promise<void> {
+    let captchaToken: string | undefined;
+    if (getCaptchaToken) {
+      try {
+        captchaToken = await getCaptchaToken();
+      } catch {
+        throw new GuestAuthError("captcha");
+      }
+    }
     let result: Awaited<ReturnType<GuestAuthPort["signInAnonymously"]>>;
     try {
-      result = await auth().signInAnonymously();
+      result = captchaToken
+        ? await auth().signInAnonymously({ options: { captchaToken } })
+        : await auth().signInAnonymously();
     } catch (error: unknown) {
       throw signInError(error);
     }

@@ -11,7 +11,13 @@
 export type ClientAuthConfig =
   | { mode: "fixture" }
   | { mode: "demo"; scenario: string }
-  | { mode: "supabase"; url: string | null; anonKey: string | null };
+  | {
+      mode: "supabase";
+      url: string | null;
+      anonKey: string | null;
+      /** Public Turnstile site key (step 6). Null means guest sign-in sends no CAPTCHA token. */
+      turnstileSiteKey?: string | null;
+    };
 
 /** The scenario demo mode loads when `SLEUTH_DEMO_SCENARIO` is unset or blank. */
 export const DEFAULT_DEMO_SCENARIO = "proofpay-v1";
@@ -25,5 +31,8 @@ export function clientAuthConfigFromEnv(
   if (env.SLEUTH_DATA_MODE !== "supabase") return { mode: "fixture" };
   const url = env.NEXT_PUBLIC_SUPABASE_URL?.trim() || null;
   const anonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || null;
-  return { mode: "supabase", url, anonKey };
+  const turnstileSiteKey = env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || null;
+  return turnstileSiteKey
+    ? { mode: "supabase", url, anonKey, turnstileSiteKey }
+    : { mode: "supabase", url, anonKey };
 }

@@ -1,6 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { ClientAuthConfig } from "./auth-config";
 import { createFixtureGuestAuth, createGuestAuth, type GuestAuth, type GuestAuthPort } from "./guest-auth";
+import { getTurnstileToken } from "./turnstile";
 
 /**
  * The browser's guest sign-in for a server-given config.
@@ -17,5 +18,9 @@ export function createBrowserGuestAuth(
   if (config.mode !== "supabase") return createFixtureGuestAuth();
   const { url, anonKey } = config;
   if (!url || !anonKey) return createGuestAuth(null);
-  return createGuestAuth((): GuestAuthPort => createClient(url, anonKey).auth);
+  const siteKey = config.turnstileSiteKey;
+  return createGuestAuth(
+    (): GuestAuthPort => createClient(url, anonKey).auth,
+    siteKey ? () => getTurnstileToken(siteKey) : undefined,
+  );
 }
