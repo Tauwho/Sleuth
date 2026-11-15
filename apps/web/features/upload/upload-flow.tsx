@@ -7,6 +7,7 @@ import {
   type UploadUrlRequestSchema,
   type UploadUrlResponseSchema,
 } from "@sleuth/contracts";
+import { useDemoApi } from "@/components/guest-auth-provider";
 import { Button } from "@/components/ui/button";
 import { ApiClientError } from "@/lib/api-client";
 import {
@@ -97,6 +98,7 @@ export function UploadFlow({
   readDuration = readVideoDurationMs,
   upload = uploadBytes,
 }: UploadFlowProps) {
+  const demo = useDemoApi() !== null;
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [file, setFile] = useState<{ file: File; durationMs: number } | null>(null);
   const inputId = useId();
@@ -235,8 +237,9 @@ export function UploadFlow({
             <p className="font-medium text-foreground">Video version {phase.version} saved.</p>
             {phase.result === "skipped_in_fixture_mode" ? (
               <p className="mt-1 text-muted">
-                Fixture mode has no storage, so the file was not sent anywhere. Only its name and
-                length were saved.
+                {demo
+                  ? "Demo mode keeps everything in this browser, so the file was not sent anywhere. Only its name and length were saved, and analyses still replay the demo's saved run."
+                  : "Fixture mode has no storage, so the file was not sent anywhere. Only its name and length were saved."}
               </p>
             ) : null}
             <p className="mt-1 text-muted">

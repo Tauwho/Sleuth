@@ -9,6 +9,7 @@ Demo videos were recorded on production with a guest copy of the public demo (D-
 - State is an ordered log of the calls that changed something, kept in sessionStorage per tab and replayed on load with the recorded clock values. A reload shows the same state, a new tab starts fresh, and nothing is shared between visitors.
 - A scenario (`apps/web/lib/demo/scenario.ts`, Zod-checked) holds a fixed job timeline and the recorded transcript and frames. "Run analysis" goes queued, then running, then succeeded at the scenario's times, and the real evidence engine runs on the recorded answers. The same steps give the same evidence and findings every time.
 - Every page shows the scenario's disclosure (sample data, nothing leaves the browser).
+- A scenario may bring its own video, served by this app from `apps/web/public/scenarios/<id>/`. `proofpay-v1` has a 52-second clip made by `scripts/make-scenario-clip.ps1` from the golden fixture: each frame's on-screen text is drawn from its timestamp, and Windows text-to-speech reads each transcript line at its start time. So the video, the recorded transcript and the recorded frames agree. No third-party media. The demo and its copies play it; an uploaded video in demo mode has no file and keeps the simulated clock.
 - To run the engine in the browser, `@sleuth/media/core` exports the provider ports, mocks and validation without FFmpeg.
 
 ## Limits

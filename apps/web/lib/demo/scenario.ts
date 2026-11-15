@@ -17,6 +17,18 @@ export const DemoScenarioSchema = z
       runningAfterMs: z.number().int().nonnegative(),
       succeededAfterMs: z.number().int().positive(),
     }),
+    /**
+     * The scenario's own video, served by this app from `apps/web/public`. It plays for every
+     * video version the scenario brings (the demo and its copies), never for an upload.
+     */
+    video: z
+      .object({
+        path: z.string().regex(/^\/scenarios\/[a-z0-9-]+\/[\w.-]+\.(mp4|webm)$/),
+        durationMs: z.number().int().positive(),
+        /** How the video was made, in one line. Shown nowhere, kept for whoever re-records it. */
+        provenance: z.string().trim().min(1).max(300),
+      })
+      .optional(),
     /** Recorded provider answers, replayed for every analysis in this scenario. */
     replay: z.object({
       transcript: z.array(TranscriptSegmentSchema),

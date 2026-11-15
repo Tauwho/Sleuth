@@ -58,6 +58,8 @@ export interface DemoApiOptions {
   storage?: DemoStorage | null;
   /** Wall clock in ms. Tests pass a fake one. */
   clock?: () => number;
+  /** This app's origin, to make the scenario video's URL absolute. Defaults to the page's. */
+  origin?: string;
 }
 
 export interface DemoApi {
@@ -206,6 +208,10 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
   const clock = options.clock ?? (() => Date.now());
   const key = `sleuth-demo:${scenario.id}:v1`;
   const providers = replayProviders(scenario);
+  const origin =
+    options.origin ?? (typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  /** Video versions made by an upload in this session. Only scenario videos have a file to play. */
+  let uploaded = new Set<string>();
 
   let current = 0;
   let store: FixtureStore;
@@ -221,6 +227,7 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     });
     events = [];
     pending = new Map();
+    uploaded = new Set();
   }
 
   function save() {
@@ -311,6 +318,20 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     const handler = HANDLERS[spec.id];
     if (!handler) throw new StoreError("not_found", 404, "No such endpoint in demo mode.");
     const result = await handler(store, params, body as never);
+    if (spec.id === "createUploadUrl") {
+      uploaded.add((result as { assetVersion: { id: string } }).assetVersion.id);
+    }
+    if (
+      spec.id === "getPlaybackUrl" &&
+      scenario.video &&
+      !uploaded.has(p(params, "assetVersionId"))
+    ) {
+      // The store said the version exists (else it threw). It came with the scenario: play its video.
+      return {
+        url: new URL(scenario.video.path, origin).href,
+        expiresAt: new Date(current + 24 * 60 * 60_000).toISOString(),
+      };
+    }
     if (spec.id === "startAnalysis") {
       const job = (result as { job: ProcessingJob }).job;
       if (job.status === "queued" && !pending.has(job.id)) {

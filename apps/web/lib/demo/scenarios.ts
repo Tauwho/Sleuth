@@ -14,6 +14,12 @@ const builders: Record<string, () => unknown> = {
       disclosure:
         "Demo mode: sample data. Analyses replay a saved run, and nothing you do leaves this browser.",
       timeline: { runningAfterMs: 1500, succeededAfterMs: 4500 },
+      video: {
+        path: "/scenarios/proofpay-v1/video.mp4",
+        durationMs: fx.assetVersion.durationMs,
+        provenance:
+          "scripts/make-scenario-clip.ps1 from the golden fixture: frames.json drawn as on-screen text, transcript.json read by Windows text-to-speech. No third-party media.",
+      },
       replay: { transcript: fx.transcript, frames: fx.frames },
     };
   },

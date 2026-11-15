@@ -35,6 +35,14 @@ test("the whole demo path runs with no API call and no other host, and survives 
   await expect(page.getByTestId("workspace-counts")).toHaveText(
     "4 evidence candidates, 4 findings (4 open)",
   );
+  // A real video from this app, not the simulated clock.
+  const video = page.locator("video");
+  await expect(video).toHaveAttribute("src", /\/scenarios\/proofpay-v1\/video\.mp4$/);
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => Math.round(v.duration)), {
+      timeout: 20_000,
+    })
+    .toBe(52);
 
   // Make an editable copy, as on the live site.
   await page.getByRole("button", { name: "Make an editable copy" }).first().click();
