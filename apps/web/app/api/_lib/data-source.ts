@@ -32,19 +32,13 @@ function seconds(value: string | undefined): number | undefined {
 }
 
 /**
- * The web app talks to Supabase through the **transaction** pooler (port 6543) by default (N5).
- * On 15 Nov 2026 every database read returned 500 for over 3 minutes after each production
- * redeploy: the old deployment's frozen instances still held session-pooler clients (15 in
- * total on the Free plan), so the new instances could not connect. In transaction mode a client
- * holds a server connection only while a transaction runs, which suits short serverless
- * requests. Prepared statements are already off (`createDb`), and the store's advisory locks are
- * transaction-scoped, so both work there.
- *
- * Only a Supabase pooler URL on port 5432 is rewritten. `SLEUTH_DB_POOL_MODE=session` keeps the
- * URL as given, as a one-variable rollback. The worker is not affected.
+ * Which Supabase pooler the web app uses. Default: the URL as given (the session pooler).
+ * `SLEUTH_DB_POOL_MODE=transaction` rewrites a Supabase pooler URL from port 5432 to the
+ * transaction pooler on 6543. That was the default for a few minutes on 15 Nov 2026 (N5) and made
+ * reads hang for 30 s and fail on production, so it was rolled back and is opt-in only.
  */
 export function webDatabaseUrl(url: string, mode: string | undefined): string {
-  if (mode?.trim() === "session") return url;
+  if (mode?.trim() !== "transaction") return url;
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -103,12 +97,16 @@ export function getStore(): ProjectStore {
       const url = process.env.DATABASE_URL?.trim();
       if (!url) throw notConfigured("DATABASE_URL");
       globalForStore.__sleuthSupabaseStore = createSupabaseStore({
-        // Each Vercel instance holds at most 2 connections and frees them after 10 idle seconds.
-        // With the default (5, never idle out), three warm instances filled the session pooler's
-        // 15 slots on 14 Nov 2026 and every write returned 500 (EMAXCONNSESSION).
+        // Each Vercel instance holds at most 2 connections and frees them after 2 idle seconds (N5).
+        // The session pooler allows 15 clients in total. On 14 Nov, three warm instances with 5 each
+        // filled it (EMAXCONNSESSION). On 15 Nov, after each redeploy, the old deployment's frozen
+        // instances still held their clients for minutes, so the new ones got 500 on every read.
+        // A 2 s idle limit closes a connection before an instance is frozen, at the cost of a
+        // reconnect for the next request.
         db: createDb(webDatabaseUrl(url, process.env.SLEUTH_DB_POOL_MODE), {
+          // 2, not 1: a query outside a transaction must never wait for that transaction.
           max: 2,
-          idleTimeoutSeconds: 10,
+          idleTimeoutSeconds: 2,
         }).db,
         storage: storageFromEnv() ?? undefined,
         ...limits(),

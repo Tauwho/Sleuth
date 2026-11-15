@@ -6,12 +6,13 @@ const SESSION =
   "postgresql://postgres.abcdefghijklmnopqrst:pw@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres";
 
 describe("webDatabaseUrl (N5)", () => {
-  it("moves a Supabase session-pooler URL to the transaction pooler", () => {
-    expect(webDatabaseUrl(SESSION, undefined)).toBe(SESSION.replace(":5432/", ":6543/"));
+  it("keeps the URL as given by default", () => {
+    expect(webDatabaseUrl(SESSION, undefined)).toBe(SESSION);
+    expect(webDatabaseUrl(SESSION, "session")).toBe(SESSION);
   });
 
-  it("keeps the URL with SLEUTH_DB_POOL_MODE=session", () => {
-    expect(webDatabaseUrl(SESSION, "session")).toBe(SESSION);
+  it("moves to the transaction pooler only when asked", () => {
+    expect(webDatabaseUrl(SESSION, "transaction")).toBe(SESSION.replace(":5432/", ":6543/"));
   });
 
   it("leaves other databases and ports alone", () => {
@@ -21,7 +22,7 @@ describe("webDatabaseUrl (N5)", () => {
       SESSION.replace(":5432/", ":6543/"),
       "not a url",
     ]) {
-      expect(webDatabaseUrl(url, undefined)).toBe(url);
+      expect(webDatabaseUrl(url, "transaction")).toBe(url);
     }
   });
 });
