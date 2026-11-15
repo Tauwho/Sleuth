@@ -58,14 +58,17 @@ function JobStages({ job, now }: { job: ProcessingJob; now: number }) {
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "The analysis could not be started.";
+  return error instanceof Error && error.message
+    ? error.message
+    : "The analysis could not be started.";
 }
 
 /** A job that has waited this long in the queue gets a clear message (WP6). */
 export const STALLED_AFTER_MS = 30 * 60_000;
 
 const STATUS_TEXT: Record<"queued" | "running", string> = {
-  queued: "Queued. Analysis starts within about 10 to 15 minutes.",
+  queued:
+    "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy.",
   running: "Analysis running.",
 };
 
@@ -78,7 +81,9 @@ const DEMO_STATUS_TEXT: Record<"queued" | "running", string> = {
 /** Items a person still has to look at: AI candidates not yet decided, and open findings. */
 function needsPerson(evidence: readonly EvidenceCandidate[], findings: readonly Finding[]) {
   return {
-    candidates: evidence.filter((e) => e.status === "candidate" || e.status === "needs_outside_proof").length,
+    candidates: evidence.filter(
+      (e) => e.status === "candidate" || e.status === "needs_outside_proof",
+    ).length,
     openFindings: findings.filter((f) => f.status === "open").length,
   };
 }
@@ -133,13 +138,16 @@ export function AnalysisPanel({
   const counts = needsPerson(evidence, findings);
 
   return (
-    <section aria-labelledby="analysis-heading" className="rounded-md border border-line bg-surface p-4">
+    <section
+      aria-labelledby="analysis-heading"
+      className="rounded-md border border-line bg-surface p-4"
+    >
       <h2 id="analysis-heading" className="font-display text-lg text-foreground">
         Analysis
       </h2>
       <p className="mt-1 text-sm text-muted">
-        Matches the script and checklist against the current video. Every match it finds is a candidate for a
-        person to check.
+        Matches the script and checklist against the current video. Every match it finds is a
+        candidate for a person to check.
       </p>
 
       <p className="mt-2 text-xs text-muted" data-testid="analysis-limits">
@@ -149,7 +157,9 @@ export function AnalysisPanel({
       </p>
 
       {readOnly ? (
-        <p className="mt-3 text-sm text-muted">The demo is read-only. Make an editable copy to run an analysis.</p>
+        <p className="mt-3 text-sm text-muted">
+          The demo is read-only. Make an editable copy to run an analysis.
+        </p>
       ) : job === null || job.status === "succeeded" ? (
         <Button className="mt-3" size="sm" disabled={starting} onClick={() => void start()}>
           {starting ? "Starting..." : job === null ? "Run analysis" : "Run analysis again"}
@@ -165,8 +175,9 @@ export function AnalysisPanel({
             <JobStages job={job} now={now} />
             {demo ? null : (
               <p className="mt-2 text-xs text-muted">
-                The real job state is checked every 2 seconds. You can leave this page and come back; the result
-                is kept. If no worker is running (fixture mode in the web app has none), the job stays queued.
+                The real job state is checked every 2 seconds. You can leave this page and come
+                back; the result is kept. If no worker is running (fixture mode in the web app has
+                none), the job stays queued.
               </p>
             )}
             {!demo && alert.permission === "default" ? (
@@ -181,14 +192,22 @@ export function AnalysisPanel({
             ) : null}
           </div>
         ) : null}
-        {job && job.status === "queued" && now > 0 && now - Date.parse(job.createdAt) > STALLED_AFTER_MS ? (
+        {job &&
+        job.status === "queued" &&
+        now > 0 &&
+        now - Date.parse(job.createdAt) > STALLED_AFTER_MS ? (
           <p role="alert" data-testid="job-stalled" className="mt-3 text-sm text-warn">
-            This job has waited more than 30 minutes. The worker may be late or stopped. You can keep waiting, or
-            come back later: the job is kept. If it is still queued after an hour, tell the team.
+            This job has waited more than 30 minutes. The worker may be late or stopped. You can
+            keep waiting, or come back later: the job is kept. If it is still queued after an hour,
+            tell the team.
           </p>
         ) : null}
         {job && job.status === "succeeded" ? (
-          <div role="status" data-testid="job-done" className="rounded-md border border-line p-3 text-sm">
+          <div
+            role="status"
+            data-testid="job-done"
+            className="rounded-md border border-line p-3 text-sm"
+          >
             <p className="font-medium text-foreground">Analysis done.</p>
             <p className="mt-1 text-muted">
               Still needs a person: {counts.candidates} evidence{" "}
@@ -201,15 +220,25 @@ export function AnalysisPanel({
 
       {job && job.status === "failed" ? (
         <div role="alert" data-testid="job-failed" className="mt-3 text-sm">
-          <p className="font-medium text-danger">The analysis failed after {job.attempts} of {job.maxAttempts} attempts.</p>
+          <p className="font-medium text-danger">
+            The analysis failed after {job.attempts} of {job.maxAttempts} attempts.
+          </p>
           <p className="mt-1 text-muted">{job.error ?? "No error text was given."}</p>
-          <Button className="mt-2" size="sm" variant="outline" disabled={starting} onClick={() => void start()}>
+          <Button
+            className="mt-2"
+            size="sm"
+            variant="outline"
+            disabled={starting}
+            onClick={() => void start()}
+          >
             {starting ? "Starting..." : "Try again"}
           </Button>
         </div>
       ) : null}
       {checkError && active ? (
-        <p className="mt-2 text-sm text-warn">Could not check the job: {checkError} Trying again in 2 seconds.</p>
+        <p className="mt-2 text-sm text-warn">
+          Could not check the job: {checkError} Trying again in 2 seconds.
+        </p>
       ) : null}
       {startError ? (
         <p role="alert" className="mt-2 text-sm text-danger">

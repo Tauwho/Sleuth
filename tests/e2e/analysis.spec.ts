@@ -18,12 +18,20 @@ const openTab = (page: Page, name: string) => page.getByRole("tab", { name, exac
  * locally. With the shared default user, the 6th analysis since the server started got 429
  * and these tests failed on the third run against the same server.
  */
-async function openCopy(page: Page, request: APIRequestContext): Promise<{ id: string; headers: Record<string, string> }> {
-  const headers = { "x-fixture-user": `e2e-analysis-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` };
+async function openCopy(
+  page: Page,
+  request: APIRequestContext,
+): Promise<{ id: string; headers: Record<string, string> }> {
+  const headers = {
+    "x-fixture-user": `e2e-analysis-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  };
   await page.setExtraHTTPHeaders(headers);
   const res = await request.post("/api/v1/projects", {
     headers,
-    data: { name: `Analysis copy ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, copyFromDemo: true },
+    data: {
+      name: `Analysis copy ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      copyFromDemo: true,
+    },
   });
   expect(res.status()).toBe(201);
   const id = ((await res.json()) as { project: { id: string } }).project.id;
@@ -33,7 +41,10 @@ async function openCopy(page: Page, request: APIRequestContext): Promise<{ id: s
   return { id, headers };
 }
 
-test("Run analysis queues a real job and polls it every 2 seconds, one check at a time", async ({ page, request }) => {
+test("Run analysis queues a real job and polls it every 2 seconds, one check at a time", async ({
+  page,
+  request,
+}) => {
   const { id, headers } = await openCopy(page, request);
   const checks: number[] = [];
   let inFlight = 0;
@@ -49,7 +60,9 @@ test("Run analysis queues a real job and polls it every 2 seconds, one check at 
     if (/\/jobs\/[^/]+$/.test(r.url())) inFlight -= 1;
   });
 
-  const started = page.waitForResponse((r) => r.url().endsWith("/analysis") && r.request().method() === "POST");
+  const started = page.waitForResponse(
+    (r) => r.url().endsWith("/analysis") && r.request().method() === "POST",
+  );
   await panel(page).getByRole("button", { name: "Run analysis" }).click();
   const res = await started;
   expect(res.status()).toBe(202);
@@ -57,7 +70,7 @@ test("Run analysis queues a real job and polls it every 2 seconds, one check at 
   expect(job.status).toBe("queued");
 
   await expect(page.getByTestId("job-processing")).toContainText(
-    "Queued. Analysis starts within about 10 to 15 minutes. Attempt 0 of 3.",
+    "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy. Attempt 0 of 3.",
   );
   await expect.poll(() => checks.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(3);
   const gaps = checks.slice(1).map((t, i) => t - (checks[i] ?? t));
@@ -67,7 +80,9 @@ test("Run analysis queues a real job and polls it every 2 seconds, one check at 
   // The UI shows the real state the server reports: still queued.
   const fromApi = await request.get(`/api/v1/projects/${id}/jobs/${job.id}`, { headers });
   expect(((await fromApi.json()) as { job: { status: string } }).job.status).toBe("queued");
-  await expect(page.getByTestId("job-processing")).toContainText("Queued. Analysis starts within about 10 to 15 minutes.");
+  await expect(page.getByTestId("job-processing")).toContainText(
+    "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy.",
+  );
 });
 
 test("leaving the workspace stops the polling", async ({ page, request }) => {
@@ -88,6 +103,8 @@ test("leaving the workspace stops the polling", async ({ page, request }) => {
 test("the demo cannot start an analysis", async ({ page }) => {
   await page.goto("/projects/proofpay-demo");
   await openTab(page, "Analysis");
-  await expect(panel(page)).toContainText("The demo is read-only. Make an editable copy to run an analysis.");
+  await expect(panel(page)).toContainText(
+    "The demo is read-only. Make an editable copy to run an analysis.",
+  );
   await expect(panel(page).getByRole("button", { name: "Run analysis" })).toHaveCount(0);
 });

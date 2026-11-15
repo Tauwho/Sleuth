@@ -1,4 +1,4 @@
-﻿# 0009 Worker trigger: a scheduled GitHub Actions run every 10 minutes
+# 0009 Worker trigger: a scheduled GitHub Actions run every 10 minutes
 
 ## Context
 Visitors' analysis jobs are queued in the production database. Nothing runs them until a worker takes them (ADR 0008 and decision D-5: the worker lives on a free GitHub Actions schedule). Until now the `schedule` in `.github/workflows/worker.yml` was commented out, so a queued job only ran when someone started the workflow by hand.
@@ -30,3 +30,7 @@ The decision now: a queued job must not depend on GitHub's cron alone.
 - **Overlap:** the workflow's `concurrency: group: worker` keeps one run going and one waiting, so several starts do not run the worker twice at once.
 - **Schedule:** the 10-minute schedule stays as the second path, for a start that failed, and for jobs that retry after a failure.
 - **Risk:** someone holding the token can start and cancel workflow runs in this repository. The token cannot read code, change files or read other secrets. Give it an expiry date (60 days covers judging) and remove it from Vercel after judging.
+
+## Amendment, 15 November 2026: the queued message
+
+With the dispatch token working again after the repository moved to `Tauwho/Sleuth`, a guest job on 15 Nov started at once and finished in under a minute. The queued message now says: "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy." The schedule stays as the second path.
