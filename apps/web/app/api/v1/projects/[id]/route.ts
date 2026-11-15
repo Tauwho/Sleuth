@@ -5,3 +5,8 @@ export const dynamic = "force-dynamic";
 export const GET = endpoint("getProject", async ({ actor, store, params }) =>
   store.getProjectDetail(actor, params.id ?? ""),
 );
+
+export const DELETE = endpoint("deleteProject", async ({ actor, store, params }) => ({
+  deleted: true as const,
+  ...(await store.deleteProject(actor, params.id ?? "")),
+}));

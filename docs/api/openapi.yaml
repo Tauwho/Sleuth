@@ -415,6 +415,69 @@ paths:
           content:
             application/json:
               schema: *a1
+    delete:
+      operationId: deleteProject
+      summary: Delete a project you own, with its stored videos
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    enum:
+                      - true
+                  projectId:
+                    type: string
+                    minLength: 1
+                  files:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - deleted
+                  - projectId
+                  - files
+                additionalProperties: false
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema: *a1
+        "401":
+          description: Sign-in required
+          content:
+            application/json:
+              schema: *a1
+        "403":
+          description: Not allowed (for example, the demo project is read-only)
+          content:
+            application/json:
+              schema: *a1
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: *a1
+        "409":
+          description: Conflict with current state
+          content:
+            application/json:
+              schema: *a1
+        "429":
+          description: Daily limit reached; details.resetsAt says when it resets
+          content:
+            application/json:
+              schema: *a1
   /projects/{id}/assets/upload-url:
     post:
       operationId: createUploadUrl

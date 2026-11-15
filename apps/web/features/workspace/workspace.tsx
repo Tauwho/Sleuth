@@ -19,6 +19,7 @@ import { PlaybackVideo } from "../player/playback-video";
 import { usePlaybackUrl } from "../player/use-playback-url";
 import { useVideoPlayer } from "../player/use-video-player";
 import { SimulatedClock } from "../player/simulated-clock";
+import { DeleteProject } from "./delete-project";
 import { useSimulatedPlayer } from "../player/use-simulated-player";
 import { SentenceList, type SentenceListHandle } from "../script/sentence-list";
 import { buildMarkers, formatSeconds, primaryMarkerFor, type TimelineMarker } from "../timeline/markers";
@@ -83,6 +84,7 @@ function Header({ state }: { state: ProjectState }) {
           Open the Final Seal report
         </Link>
       </p>
+      {project.isDemo ? null : <DeleteProject projectId={project.id} projectName={project.name} />}
     </header>
   );
 }

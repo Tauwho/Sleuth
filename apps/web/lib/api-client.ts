@@ -5,6 +5,7 @@ import {
   CreateReshootResponseSchema,
   CreateScriptRequestSchema,
   CreateScriptResponseSchema,
+  DeleteProjectResponseSchema,
   ErrorResponseSchema,
   GetCoverageResponseSchema,
   GetJobResponseSchema,
@@ -120,6 +121,10 @@ export function createApiClient(options: ApiClientOptions = {}) {
 
     getProject: (id: string) =>
       call(GetProjectResponseSchema, "GET", `/projects/${encodeURIComponent(id)}`),
+
+    /** Delete a project you own, with its stored videos. Only from a person's explicit action. */
+    deleteProject: (id: string) =>
+      call(DeleteProjectResponseSchema, "DELETE", `/projects/${encodeURIComponent(id)}`),
 
     // ---- assets ----
 
