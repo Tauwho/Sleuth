@@ -1,0 +1,21 @@
+{
+  "name": "proofpay-smoke",
+  "note": "Harness smoke sample (N10). The video is our own generated ProofPay clip (scripts/make-scenario-clip.ps1, apps/web/public/scenarios/proofpay-v1/video.mp4). The transcript, frames and labels come from the golden fixture, so a mock run must agree with them: this tests the harness, not accuracy.",
+  "durationMs": 52000,
+  "labelledBy": "derived from the golden fixture\u0027s expected findings, not watched",
+  "script": [
+    "Welcome to ProofPay, the invoicing tool for freelancers.",
+    "First, click New Invoice to start a draft.",
+    "Enter the client name and the amount of 1,250 dollars.",
+    "Click Export to download the invoice as a PDF.",
+    "All customer data is encrypted end to end.",
+    "Thanks for watching."
+  ],
+  "checklist": [
+    "Show the ProofPay welcome screen",
+    "Create a new invoice",
+    "Fill in the client and the amount",
+    "Export the invoice as a PDF",
+    "State that customer data is encrypted"
+  ]
+}

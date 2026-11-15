@@ -1,0 +1,34 @@
+{
+  "clip": "proofpay-smoke",
+  "labelledBy": "derived from the golden fixture\u0027s expected findings, not watched",
+  "labelledOn": "2026-11-15",
+  "findings": [
+    {
+      "type": "cursed_frame",
+      "scriptLine": 1,
+      "note": "Fixture: only the logo is on screen while the welcome line is said."
+    },
+    {
+      "type": "phantom_dialogue",
+      "scriptLine": 4,
+      "note": "Fixture: the Export line is never said."
+    },
+    {
+      "type": "needs_outside_proof",
+      "scriptLine": 5,
+      "note": "Fixture: a claim about encryption."
+    },
+    {
+      "type": "ghost",
+      "checklistItem": 4,
+      "note": "Fixture: the PDF export is never shown."
+    }
+  ],
+  "unscripted": [
+    {
+      "atMs": 19000,
+      "note": "Fixture transcript: \u0027Then I save it and check the preview.\u0027 is not in the script."
+    }
+  ],
+  "reordered": []
+}
