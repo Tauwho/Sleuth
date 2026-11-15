@@ -3,6 +3,7 @@ import { loadGoldenFixture } from "@sleuth/db/fixture";
 import {
   createDeepgramTranscription,
   createGeminiVideoAnalysis,
+  createTesseractVideoAnalysis,
   type ProviderUsage,
   type TranscriptionProvider,
   type VideoAnalysisProvider,
@@ -18,6 +19,11 @@ export interface ProviderSet {
    * the job runs speech only. Asked once per job, from the project's owner.
    */
   sendsFramesFor(owner: JobOwner): boolean;
+  /**
+   * Runs on this machine only (OCR, step 8), so any owner may use it. Used when `sendsFramesFor`
+   * says no. Null or missing: such jobs stay speech only.
+   */
+  localVideoAnalysis?: VideoAnalysisProvider | null;
 }
 
 /**
@@ -64,6 +70,7 @@ export type ProviderConfig = Pick<
   | "ALLOW_MOCK_PROVIDERS"
   | "MAX_FRAMES_PER_VIDEO"
 > &
+  Partial<Pick<WorkerConfig, "LOCAL_OCR">> &
   Partial<
     Pick<
       WorkerConfig,
@@ -94,6 +101,16 @@ export function geminiFramesAllowed(owner: JobOwner, ownerIds: readonly string[]
  * setting, never its value.
  */
 export function createProviders(
+  config: ProviderConfig,
+  onUsage?: (usage: ProviderUsage) => void,
+): ProviderSet {
+  const set = createRemoteProviders(config, onUsage);
+  return config.LOCAL_OCR === "tesseract"
+    ? { ...set, localVideoAnalysis: createTesseractVideoAnalysis() }
+    : set;
+}
+
+function createRemoteProviders(
   config: ProviderConfig,
   onUsage?: (usage: ProviderUsage) => void,
 ): ProviderSet {

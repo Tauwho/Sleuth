@@ -93,10 +93,13 @@ export function createSupabaseHandler(options: SupabaseHandlerOptions): JobHandl
     const inputs = await step("load", () => options.store.loadJobInputs(job.id, options.workerId));
     if (inputs.asset.durationMs > maxMs) throw new MediaError("probe", "duration_exceeded");
     // Decision D-4: frames leave this machine only when the provider set allows it for this owner.
-    const videoAnalysis =
-      options.providers.videoAnalysis !== null && options.providers.sendsFramesFor(inputs.owner)
-        ? options.providers.videoAnalysis
-        : null;
+    // Otherwise local OCR (step 8), which reads frames on this machine and sends them nowhere.
+    const remoteAllowed =
+      options.providers.videoAnalysis !== null && options.providers.sendsFramesFor(inputs.owner);
+    const videoAnalysis = remoteAllowed
+      ? options.providers.videoAnalysis
+      : (options.providers.localVideoAnalysis ?? null);
+    const screenSource = remoteAllowed ? "remote" : videoAnalysis !== null ? "local_ocr" : "none";
     const url = await step("download", () => options.store.createVideoDownloadUrl(inputs));
 
     const produced = await step("media", () =>
@@ -158,6 +161,7 @@ export function createSupabaseHandler(options: SupabaseHandlerOptions): JobHandl
       durationMs: produced.durationMs,
       frames: produced.frameCount,
       speechOnly: videoAnalysis === null ? 1 : 0,
+      screenSource,
       transcriptSegments: result.transcript.length,
       evidence: result.evidence.length,
       findings: result.findings.length,

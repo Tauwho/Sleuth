@@ -29,8 +29,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # The FFmpeg tests (evidence-analysis 1, 2, 12) skip themselves when it is missing.
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      # Tesseract: the local OCR test (step 8) skips itself when it is missing.
+      - name: Install FFmpeg and Tesseract
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng
 
       - name: Lint
         run: pnpm lint
