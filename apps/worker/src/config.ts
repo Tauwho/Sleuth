@@ -16,6 +16,11 @@ const EnvSchema = z.object({
    */
   VIDEO_ANALYSIS_PROVIDER: z.string().default("mock"),
   /**
+   * `tesseract`: when a job may not send frames to `VIDEO_ANALYSIS_PROVIDER` (visitors, D-4), read
+   * the on-screen text on this machine instead (step 8). `none` (default): such jobs stay speech only.
+   */
+  LOCAL_OCR: z.enum(["none", "tesseract"]).default("none"),
+  /**
    * With `VIDEO_ANALYSIS_PROVIDER=gemini`: the only project owners whose frames may go to Gemini,
    * comma separated user ids. Our own team accounts only, never a visitor. Empty means nobody, so
    * every job is speech-only. An anonymous or unknown owner is speech-only even when listed.
