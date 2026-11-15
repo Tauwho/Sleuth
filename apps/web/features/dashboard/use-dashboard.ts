@@ -23,7 +23,21 @@ export interface DashboardState {
   /** The full message to show, already worded for people. */
   createError: string | undefined;
   reload: () => void;
+  /** Copy the demo (the original create action). */
   createProject: () => Promise<void>;
+  /** Make an empty project for your own video, script and checklist, then open it. */
+  createBlankProject: (name: string) => Promise<void>;
+}
+
+/** The name a blank project gets: what the person typed, trimmed, or a plain default. */
+export function blankProjectName(typed: string): string {
+  const name = typed.trim().replace(/\s+/g, " ").slice(0, 120);
+  return name || "My demo video";
+}
+
+/** Default navigation; tests pass their own. */
+function goTo(path: string) {
+  window.location.assign(path);
 }
 
 function messageOf(error: unknown): string {
@@ -41,7 +55,11 @@ export function formatLastChange(updatedAt: string): string {
 }
 
 /** Loads projects and their open-findings counts, and offers a copy-from-demo create action. */
-export function useDashboard(client?: ApiClient, auth?: GuestAuth): DashboardState {
+export function useDashboard(
+  client?: ApiClient,
+  auth?: GuestAuth,
+  navigate: (path: string) => void = goTo,
+): DashboardState {
   const shared = useApiClient();
   const sharedAuth = useGuestAuth();
   const api = useMemo(() => client ?? shared, [client, shared]);
@@ -97,6 +115,35 @@ export function useDashboard(client?: ApiClient, auth?: GuestAuth): DashboardSta
     setAttempt((n) => n + 1);
   }, []);
 
+  const createBlankProject = useCallback(
+    async (name: string) => {
+      if (createInFlight.current) return;
+      createInFlight.current = true;
+      setCreateError(undefined);
+      try {
+        if (guest.mode === "supabase") setCreatePhase("signing_in");
+        try {
+          await guest.ensureSession();
+        } catch (error: unknown) {
+          setCreateError(guestAuthMessage(error) ?? `Could not sign in: ${messageOf(error)}`);
+          return;
+        }
+        setCreatePhase("creating");
+        try {
+          const { project } = await api.createProject(blankProjectName(name), false);
+          // Open it at once: a blank project starts in the Script tab.
+          navigate(`/projects/${encodeURIComponent(project.id)}`);
+        } catch (error: unknown) {
+          setCreateError(`Could not create the project: ${messageOf(error)}`);
+        }
+      } finally {
+        createInFlight.current = false;
+        setCreatePhase("idle");
+      }
+    },
+    [api, guest, navigate],
+  );
+
   const createProject = useCallback(async () => {
     if (createInFlight.current) return;
     createInFlight.current = true;
@@ -133,5 +180,6 @@ export function useDashboard(client?: ApiClient, auth?: GuestAuth): DashboardSta
     createError,
     reload,
     createProject,
+    createBlankProject,
   };
 }

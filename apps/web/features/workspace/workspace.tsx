@@ -259,6 +259,14 @@ function WorkspaceView({ state, initialLine }: { state: ProjectState; initialLin
             This project has no script and no evidence candidates. Nothing was checked, so no
             finding is shown.
           </p>
+          {state.detail?.project.isDemo ? null : (
+            <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-muted" data-testid="blank-steps">
+              <li>Script tab: paste what you mean to say, one sentence per line, and save.</li>
+              <li>Checklist tab: add what the video must show, and save.</li>
+              <li>Upload tab: choose your video (up to 50 MB and 3 minutes).</li>
+              <li>Analysis tab: run an analysis, then review each candidate.</li>
+            </ol>
+          )}
         </div>
       ) : null}
 
