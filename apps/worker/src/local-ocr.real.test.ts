@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { createTesseractVideoAnalysis } from "@sleuth/media";
 
-function has(binary: string): boolean {
+function has(binary: string, flag: string): boolean {
   try {
-    execFileSync(binary, ["--version"], { stdio: "ignore" });
+    execFileSync(binary, [flag], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -15,7 +15,8 @@ function has(binary: string): boolean {
 }
 
 // CI installs both (ci.yml). Locally the test skips itself when either is missing.
-const ready = has("tesseract") && has("ffmpeg");
+// ffmpeg takes `-version`; `--version` is an error and made this test skip in CI.
+const ready = has("tesseract", "--version") && has("ffmpeg", "-version");
 const suite = ready ? describe : describe.skip;
 
 suite("Tesseract on a real frame (step 8)", () => {
