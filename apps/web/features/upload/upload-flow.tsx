@@ -22,7 +22,7 @@ import {
 type UploadUrlRequest = z.infer<typeof UploadUrlRequestSchema>;
 type UploadUrlResponse = z.infer<typeof UploadUrlResponseSchema>;
 
-export type UploadResult = "uploaded" | "skipped_in_fixture_mode";
+export type UploadResult = "uploaded" | "skipped_in_fixture_mode" | "kept_in_tab";
 
 /**
  * Sends the bytes to the signed URL with progress. Fixture mode has no storage: the server
@@ -98,7 +98,8 @@ export function UploadFlow({
   readDuration = readVideoDurationMs,
   upload = uploadBytes,
 }: UploadFlowProps) {
-  const demo = useDemoApi() !== null;
+  const demoApi = useDemoApi();
+  const demo = demoApi !== null;
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [file, setFile] = useState<{ file: File; durationMs: number } | null>(null);
   const inputId = useId();
@@ -138,9 +139,14 @@ export function UploadFlow({
     }
     setPhase({ kind: "uploading", fraction: 0 });
     try {
-      const result = await upload(target.uploadUrl, chosen.file, (fraction) =>
-        setPhase({ kind: "uploading", fraction }),
-      );
+      // Demo mode keeps the file in this tab so it plays here (N4); nothing is sent anywhere.
+      const kept = demoApi?.keepUpload(target.uploadUrl, chosen.file) ?? false;
+      if (kept) setPhase({ kind: "uploading", fraction: 1 });
+      const result: UploadResult = kept
+        ? "kept_in_tab"
+        : await upload(target.uploadUrl, chosen.file, (fraction) =>
+            setPhase({ kind: "uploading", fraction }),
+          );
       setPhase({ kind: "done", result, version: target.assetVersion.version });
       await onUploaded();
     } catch (e: unknown) {
@@ -235,6 +241,13 @@ export function UploadFlow({
         {phase.kind === "done" ? (
           <div role="status" className="rounded-md border border-line p-3">
             <p className="font-medium text-foreground">Video version {phase.version} saved.</p>
+            {phase.result === "kept_in_tab" ? (
+              <p className="mt-1 text-muted" data-testid="kept-in-tab">
+                Demo mode keeps your video in this browser tab only: it plays here and is never sent
+                anywhere. Analyses still replay the demo&apos;s saved run. After a reload the video
+                is gone and the simulated clock returns.
+              </p>
+            ) : null}
             {phase.result === "skipped_in_fixture_mode" ? (
               <p className="mt-1 text-muted">
                 {demo

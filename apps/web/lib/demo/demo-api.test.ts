@@ -190,6 +190,38 @@ describe("demo mode API", () => {
     expect((await s.api.getPlaybackUrl(project.id, up.assetVersion.id)).url).toBeNull();
   });
 
+  it("plays a chosen file from this tab after a demo upload, and forgets it on reset (N4)", async () => {
+    const made: string[] = [];
+    const revoked: string[] = [];
+    const demo = createDemoApi({
+      scenario,
+      clock: () => Date.parse("2026-11-20T10:00:00.000Z"),
+      objectUrls: {
+        create: () => {
+          const url = `blob:http://localhost/file-${made.length + 1}`;
+          made.push(url);
+          return url;
+        },
+        revoke: (url) => void revoked.push(url),
+      },
+    });
+    const api = createApiClient({ fetchImpl: demo.fetch });
+    const { project } = await api.createProject("Copy", true);
+    const up = await api.createUploadUrl(project.id, {
+      fileName: "mine.mp4",
+      mimeType: "video/mp4",
+      sizeBytes: 1000,
+      durationMs: 10_000,
+    });
+    expect(up.uploadUrl.startsWith("demo://keep-in-tab/")).toBe(true);
+    expect(demo.keepUpload("https://evil.example/upload", new Blob(["x"]))).toBe(false);
+    expect(demo.keepUpload(up.uploadUrl, new Blob(["video"]))).toBe(true);
+    expect((await api.getPlaybackUrl(project.id, up.assetVersion.id)).url).toBe(made[0]);
+
+    await demo.reset();
+    expect(revoked).toEqual([made[0]]);
+  });
+
   it("the scenario video file exists and matches the fixture length", async () => {
     const { existsSync, statSync } = await import("node:fs");
     const { join } = await import("node:path");
