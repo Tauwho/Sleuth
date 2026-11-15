@@ -11,6 +11,7 @@
     "dependencies": {
         "@sleuth/contracts": "workspace:*",
         "@sleuth/db": "workspace:*",
+    "@sleuth/demo-harness": "workspace:*",
         "@sleuth/domain": "workspace:*",
     "@sleuth/evidence-engine": "workspace:*",
     "@sleuth/media": "workspace:*",

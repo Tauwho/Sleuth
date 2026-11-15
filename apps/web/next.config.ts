@@ -15,6 +15,7 @@ const config: NextConfig = {
     "@sleuth/contracts",
     "@sleuth/domain",
     "@sleuth/db",
+    "@sleuth/demo-harness",
     "@sleuth/evidence-engine",
     "@sleuth/media",
   ],

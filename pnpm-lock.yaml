@@ -98,6 +98,9 @@ importers:
       '@sleuth/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@sleuth/demo-harness':
+        specifier: workspace:*
+        version: link:../../packages/demo-harness
       '@sleuth/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -221,6 +224,12 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+
+  packages/demo-harness:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/domain:
     dependencies:
