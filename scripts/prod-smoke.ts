@@ -11,9 +11,18 @@
  *   pnpm tsx scripts/prod-smoke.ts
  *   Remove-Item Env:PROD_SUPABASE_URL, Env:PROD_SUPABASE_ANON_KEY
  *
+ * With CAPTCHA protection on in Supabase (step 6), a script cannot sign in anonymously: there is
+ * no human to pass the check. Then run it with the service-role key instead, which is what the
+ * `prod-smoke` GitHub workflow does with the repository secrets:
+ *   PROD_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (no anon key needed)
+ * It makes two throwaway confirmed users (`zz-test-smoke-...@example.com`) with the Auth admin
+ * API, gets each a session from a one-time magic-link token (no email is sent), runs part B as
+ * them, then deletes their projects through the API and the users themselves. Never run this
+ * mode on your own machine with the key typed into a file.
+ *
  * It does not load `.env.local`, so it can never hit the dev project by mistake. Test projects
- * are named `zz-test-<random>`. The API has no delete route, so remove them with the SQL in
- * the deploy plan afterwards. It starts no analysis job and sends nothing to Deepgram or Gemini.
+ * are named `zz-test-<random>`. Anonymous test projects are removed by the 1-day guest purge.
+ * It starts no analysis job and sends nothing to Deepgram or Gemini.
  */
 const SITE = (process.env.PROD_SITE_URL ?? "https://sleuth-eight.vercel.app").replace(/\/$/, "");
 const RAW_SB_URL = process.env.PROD_SUPABASE_URL?.trim().replace(/\/$/, "");
@@ -21,6 +30,8 @@ const RAW_SB_URL = process.env.PROD_SUPABASE_URL?.trim().replace(/\/$/, "");
 const URL_OK = RAW_SB_URL === undefined || /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(RAW_SB_URL);
 const SB_URL = URL_OK ? RAW_SB_URL : undefined;
 const SB_KEY = process.env.PROD_SUPABASE_ANON_KEY?.trim();
+/** Service-role key: only in the GitHub workflow, from a repository secret. Never printed. */
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const DEMO = "proofpay-demo";
 const MB = 1024 * 1024;
 
@@ -47,6 +58,47 @@ async function api(
   });
   const json = (await res.json().catch(() => null)) as Json;
   return { status: res.status, json };
+}
+
+/** Users made by the admin path, deleted at the end even after a failure. */
+const madeUsers: string[] = [];
+
+async function admin(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ status: number; json: Json }> {
+  const res = await fetch(`${SB_URL}/auth/v1${path}`, {
+    method,
+    headers: {
+      apikey: SERVICE_KEY!,
+      authorization: `Bearer ${SERVICE_KEY}`,
+      "content-type": "application/json",
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: res.status, json: (await res.json().catch(() => null)) as Json };
+}
+
+/** A throwaway confirmed user with a session, made with the Auth admin API (no CAPTCHA, no email). */
+async function adminUser(): Promise<{ token: string; id: string }> {
+  const email = `zz-test-smoke-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  const made = await admin("POST", "/admin/users", { email, email_confirm: true });
+  const id = made.json?.id as string | undefined;
+  if (!id) throw new Error(`test user not created: ${made.status}`);
+  madeUsers.push(id);
+  const link = await admin("POST", "/admin/generate_link", { type: "magiclink", email });
+  const hash = (link.json?.hashed_token ?? link.json?.properties?.hashed_token) as
+    string | undefined;
+  if (!hash) throw new Error(`one-time token not issued: ${link.status}`);
+  const verified = await admin("POST", "/verify", { type: "magiclink", token_hash: hash });
+  const token = verified.json?.access_token as string | undefined;
+  if (!token) throw new Error(`session not issued: ${verified.status}`);
+  return { token, id };
+}
+
+async function testUser(): Promise<{ token: string; id: string }> {
+  return SERVICE_KEY ? adminUser() : anonymousUser();
 }
 
 async function anonymousUser(): Promise<{ token: string; id: string }> {
@@ -115,16 +167,18 @@ async function visitorPart(): Promise<void> {
 }
 
 async function userPart(): Promise<void> {
-  console.log("--- Part B: two anonymous users ---");
-  const a = await anonymousUser();
-  const b = await anonymousUser();
-  check("two different anonymous users", a.id !== b.id);
+  console.log(`--- Part B: two ${SERVICE_KEY ? "throwaway admin-made" : "anonymous"} users ---`);
+  const a = await testUser();
+  const b = await testUser();
+  check("two different users", a.id !== b.id);
+  userA = a;
 
   const name = `zz-test-${Math.random().toString(36).slice(2, 8)}`;
   const created = await api("POST", "/projects", { token: a.token, body: { name } });
   const pid: string | undefined = created.json?.project?.id;
   check("user A creates a project", created.status < 300 && !!pid, String(created.status));
   if (!pid) return;
+  testProjects.push(pid);
   console.log(`      test project id: ${pid}  (name ${name})`);
 
   const own = await api("GET", `/projects/${pid}`, { token: a.token });
@@ -205,18 +259,40 @@ async function userPart(): Promise<void> {
 
   const longVideo = await request("video/webm", 180_001);
   check("API refuses a video over 180 s", longVideo.status === 400, String(longVideo.status));
-  console.log(
-    "Cleanup: remove rows named zz-test-% with the SQL in docs/deploy-plan.md section 7.",
-  );
+  if (!SERVICE_KEY) console.log("Cleanup: guest test projects are removed by the 1-day purge.");
+}
+
+let userA: { token: string; id: string } | null = null;
+const testProjects: string[] = [];
+
+/** Admin mode: delete the test project through the API (files too), then the throwaway users. */
+async function cleanup(): Promise<void> {
+  if (!SERVICE_KEY) return;
+  for (const pid of testProjects) {
+    if (!userA) break;
+    const r = await api("DELETE", `/projects/${pid}`, { token: userA.token });
+    check("test project deleted through the API", r.status === 200, String(r.status));
+  }
+  for (const id of madeUsers) {
+    const r = await admin("DELETE", `/admin/users/${id}`);
+    check("throwaway user deleted", r.status >= 200 && r.status < 300, String(r.status));
+  }
 }
 
 async function main(): Promise<void> {
   await visitorPart();
   if (!URL_OK) {
     check("PROD_SUPABASE_URL looks like https://<ref>.supabase.co (value not shown)", false);
-  } else if (SB_URL && SB_KEY) await userPart();
-  else
-    console.log("--- Part B skipped: PROD_SUPABASE_URL and PROD_SUPABASE_ANON_KEY are not set ---");
+  } else if (SB_URL && (SB_KEY || SERVICE_KEY)) {
+    try {
+      await userPart();
+    } finally {
+      await cleanup();
+    }
+  } else
+    console.log(
+      "--- Part B skipped: set PROD_SUPABASE_URL and PROD_SUPABASE_ANON_KEY (or SUPABASE_SERVICE_ROLE_KEY) ---",
+    );
   console.log(failed === 0 ? "ALL CHECKS PASSED" : `${failed} CHECK(S) FAILED`);
   process.exit(failed === 0 ? 0 : 1);
 }

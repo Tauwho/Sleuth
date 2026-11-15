@@ -1,0 +1,44 @@
+# Production smoke test, parts A and B (docs/deploy-plan.md section 5), with CAPTCHA on.
+#
+# Supabase CAPTCHA protection (step 6) stops scripts from signing in as guests, so part B runs
+# here with the service-role key from the repository secrets: two throwaway confirmed users made
+# with the Auth admin API, deleted again at the end with their test project. The script prints
+# PASS or FAIL and ids only, never a key or a token.
+name: prod-smoke
+
+on:
+  workflow_dispatch:
+  # After each production deploy is a good time; this schedule is the safety net (Mondays 04:23 UTC).
+  schedule:
+    - cron: "23 4 * * 1"
+
+concurrency:
+  group: prod-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.repository == 'Tauwho/Sleuth'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter "sleuth"
+
+      - name: Smoke test the live site
+        run: pnpm tsx scripts/prod-smoke.ts
+        env:
+          PROD_SITE_URL: https://sleuth-eight.vercel.app
+          PROD_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
