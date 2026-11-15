@@ -54,9 +54,30 @@ export function errorResponse(
 
 /** A short machine code from an error, or "-". Never a message: only [A-Z0-9_] up to 40 characters. */
 export function safeCode(err: unknown): string {
-  const code =
-    typeof err === "object" && err !== null ? (err as { code?: unknown }).code : undefined;
-  return typeof code === "string" && /^[A-Z0-9_]{2,40}$/.test(code) ? code : "-";
+  for (const e of chain(err)) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && /^[A-Z0-9_]{2,40}$/.test(code)) return code;
+  }
+  return "-";
+}
+
+/** The error and up to 3 causes below it: Drizzle wraps the driver's error in `cause`. */
+function chain(err: unknown): unknown[] {
+  const out: unknown[] = [];
+  let cur: unknown = err;
+  while (out.length < 4 && typeof cur === "object" && cur !== null) {
+    out.push(cur);
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return out;
+}
+
+/** The innermost error name that is a plain word, e.g. PostgresError under a Drizzle wrapper. */
+export function safeName(err: unknown): string {
+  const names = chain(err)
+    .map((e) => (e instanceof Error ? e.name : ""))
+    .filter((n) => /^[A-Za-z]{1,40}$/.test(n));
+  return names[names.length - 1] ?? "unknown";
 }
 
 function toErrorResponse(err: unknown): Response {
@@ -65,7 +86,7 @@ function toErrorResponse(err: unknown): Response {
   }
   // Never echo internals. Log the error name and its short code only (for example a Postgres
   // SQLSTATE or EMAXCONNSESSION), never the message or request content.
-  const name = err instanceof Error && /^[A-Za-z]{1,40}$/.test(err.name) ? err.name : "unknown";
+  const name = safeName(err);
   const code = safeCode(err);
   console.error("api_error", name, code);
   const res = errorResponse(500, "internal_error", "Something went wrong on our side.");

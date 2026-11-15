@@ -55,3 +55,13 @@ describe("x-sleuth-error on a 500", () => {
     expect(await res.text()).not.toContain("password");
   });
 });
+
+describe("the cause chain", () => {
+  it("reads the driver's name and code under a wrapper", async () => {
+    const { safeCode, safeName } = await import("./api");
+    const inner = Object.assign(new Error("secret text"), { name: "PostgresError", code: "XX000" });
+    const outer = new Error("Failed query: select ...", { cause: inner });
+    expect(safeCode(outer)).toBe("XX000");
+    expect(safeName(outer)).toBe("PostgresError");
+  });
+});
