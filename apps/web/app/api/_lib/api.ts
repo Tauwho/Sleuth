@@ -65,8 +65,14 @@ function toErrorResponse(err: unknown): Response {
   }
   // Never echo internals. Log the error name and its short code only (for example a Postgres
   // SQLSTATE or EMAXCONNSESSION), never the message or request content.
-  console.error("api_error", err instanceof Error ? err.name : "unknown", safeCode(err));
-  return errorResponse(500, "internal_error", "Something went wrong on our side.");
+  const name = err instanceof Error && /^[A-Za-z]{1,40}$/.test(err.name) ? err.name : "unknown";
+  const code = safeCode(err);
+  console.error("api_error", name, code);
+  const res = errorResponse(500, "internal_error", "Something went wrong on our side.");
+  // The same two words in a header, so a probe can see why without the runtime logs (N5).
+  // Both are checked to be short machine words: never a message, value or content.
+  res.headers.set("x-sleuth-error", `${name} ${code}`);
+  return res;
 }
 
 async function readJson(req: Request): Promise<unknown> {
