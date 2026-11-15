@@ -34,6 +34,8 @@ export const DemoScenarioSchema = z
       transcript: z.array(TranscriptSegmentSchema),
       frames: z.array(FrameObservationSchema),
     }),
+    /** The walkthrough to rehearse before recording (N3). Optional. */
+    beats: z.array(z.lazy(() => DemoBeatSchema)).optional(),
   })
   .refine((s) => s.timeline.succeededAfterMs > s.timeline.runningAfterMs, {
     message: "A job must start running before it succeeds.",
@@ -41,3 +43,41 @@ export const DemoScenarioSchema = z
   });
 
 export type DemoScenario = z.infer<typeof DemoScenarioSchema>;
+
+/**
+ * One step of a recorded walkthrough (N3). `pnpm demo:rehearse <scenario>` plays the beats in a
+ * browser against demo mode and fails on the first one that drifts: a missing or changed control,
+ * text that differs, or a step slower than `maxMs`. `say` is the narration line, for the person
+ * recording; nothing reads it aloud.
+ */
+const Say = {
+  say: z.string().max(300).optional(),
+  maxMs: z.number().int().positive().max(60_000).optional(),
+};
+export const DemoBeatSchema = z.discriminatedUnion("do", [
+  z.object({ do: z.literal("open"), path: z.string().startsWith("/"), ...Say }),
+  z.object({
+    do: z.literal("click"),
+    role: z.enum(["button", "link", "tab"]),
+    name: z.string().min(1),
+    ...Say,
+  }),
+  /** Change text in a field: the first `find` becomes `replace`. Fails if `find` is not there. */
+  z.object({
+    do: z.literal("edit"),
+    label: z.string().min(1),
+    find: z.string().min(1),
+    replace: z.string(),
+    ...Say,
+  }),
+  /** Exactly one of the targets. `text` must be contained in it (or equal, for `exact`). */
+  z.object({
+    do: z.literal("expect"),
+    testId: z.string().optional(),
+    heading: z.string().optional(),
+    url: z.string().optional(),
+    text: z.string().optional(),
+    ...Say,
+  }),
+]);
+export type DemoBeat = z.infer<typeof DemoBeatSchema>;

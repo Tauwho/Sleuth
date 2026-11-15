@@ -1,4 +1,5 @@
 import { loadGoldenFixture } from "@sleuth/db/fixture";
+import proofpayBeats from "./beats/proofpay-v1.json";
 import { DemoScenarioSchema, type DemoScenario } from "./scenario";
 
 /**
@@ -21,6 +22,9 @@ const builders: Record<string, () => unknown> = {
           "scripts/make-scenario-clip.ps1 from the golden fixture: frames.json drawn as on-screen text, transcript.json read by Windows text-to-speech. No third-party media.",
       },
       replay: { transcript: fx.transcript, frames: fx.frames },
+      // Scenes 2 to 7 of docs/submission/demo-script.md, on the demo build. Plain JSON, so the
+      // rehearsal (tests/e2e-demo/rehearse.spec.ts) reads the same file.
+      beats: proofpayBeats,
     };
   },
 };

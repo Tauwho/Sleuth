@@ -20,6 +20,7 @@
     "test:property": "vitest run .property.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:demo": "playwright test -c playwright.demo.config.ts",
+    "demo:rehearse": "tsx scripts/demo-rehearse.ts",
     "eval": "tsx tests/evaluation/run.ts",
     "build": "pnpm -r --if-present build",
     "check:contracts": "vitest run tests/contract && tsx scripts/generate-openapi.ts --check",
