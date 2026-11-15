@@ -49,15 +49,36 @@ Uploading your own video checks the speech (Deepgram) and the on-screen text (Te
 
 ```mermaid
 flowchart LR
-  Browser[Browser: Next.js UI] --> API[REST API /api/v1]
-  API --> Store{Store}
+  subgraph Browser
+    UI[Next.js UI]
+    DemoAPI[Demo mode: in-tab API, scenario replay]
+  end
+  UI -- "fixture / supabase" --> API[REST API /api/v1]
+  UI -- "demo" --> DemoAPI
+  API --> Guards[Abuse guards: guest caps, daily budget, CAPTCHA]
+  Guards --> Store{Store}
   Store --> Fixture[In-memory golden fixture]
   Store --> Supa[(Supabase: Postgres, Auth, Storage)]
-  Worker[Worker: GitHub Actions, every 10 min] --> Supa
+  API -- "job queued: workflow_dispatch" --> Worker
+  Cron[GitHub schedule, every 10 min] --> Worker
+  Worker[Worker: GitHub Actions] --> Supa
   Worker --> FFmpeg[FFmpeg: audio and frames]
-  Worker --> Providers[Deepgram speech, Gemini frames for our own clips]
+  Worker --> Speech[Deepgram, else local Whisper]
+  Worker --> Screen[Gemini for team accounts, else local Tesseract OCR]
   Worker --> Engine[Evidence engine: align and match]
 ```
+
+| Part | What it does | Where |
+|---|---|---|
+| Data modes | `fixture` (memory), `supabase` (live), `demo` (the browser answers every call from a scenario, with no network) | `apps/web/app/api/_lib/data-source.ts`, ADR 0010 |
+| Demo mode | Per-tab state, a scripted job timeline, the scenario's own clip, Reset, the recording view (`?rec=1`), `/demo/preflight`, `pnpm demo:rehearse` | `apps/web/lib/demo/`, `features/demo/` |
+| Starting the worker | The web app starts `worker.yml` as soon as a job is queued; the 10-minute schedule is the second path | `worker-dispatch.ts`, ADR 0009 |
+| Speech | Deepgram first; if it fails (credit, outage), faster-whisper on the runner | `TRANSCRIPTION_FALLBACK=whisper` |
+| Screen | Gemini only for team accounts on `VIDEO_ANALYSIS_OWNER_IDS`; everyone else gets Tesseract OCR on the runner, so no visitor frame leaves it | `LOCAL_OCR=tesseract`, ADR 0011, decision D-4 |
+| Abuse guards | 2 projects and 2 uploads per guest, 50 analyses a day in total, guests removed after 1 day, Turnstile CAPTCHA on guest sign-in | `docs/deploy-plan.md` "Abuse guards" |
+| Delete | The owner deletes a project with its stored videos | `DELETE /api/v1/projects/{id}` |
+| Database pool | Closed when no request is in flight, so a frozen serverless instance holds no pooler client | `data-source.ts` (`releaseStore`) |
+| Checks | CI: lint, types, unit and property tests, contracts, build, the Postgres suites, and the browser specs in fixture and demo mode. `prod-smoke` runs against the live site. | `.github/workflows/` |
 
 ## How we used Kiro
 
@@ -127,7 +148,7 @@ See `.kiro/steering/architecture.md` for the dependency rules.
 
 - `fixture` (default): in-memory golden fixture. Works offline.
 - `demo`: the browser answers every API call itself from a scenario, with no network, no keys and no database. Each tab has its own state, kept in sessionStorage. Analyses replay a saved run on a fixed timeline, so a recording looks the same every time (ADR 0010). Try it: `$env:SLEUTH_DATA_MODE="demo"; pnpm dev`. Browser test: `pnpm test:e2e:demo`. Before recording, open `/demo/preflight`: it checks the scenario, the video, the fonts, the window size and a clean tab, then "Reset and start recording" opens the recording view (`?rec=1`: no animations, no reset button; `?rec=0` leaves it). "Reset demo" in the banner forgets this tab's changes. `pnpm demo:rehearse proofpay-v1 --repeat 3` plays the walkthrough in `apps/web/lib/demo/beats/proofpay-v1.json` and fails on the first step that drifts or runs slow.
-- `supabase`: real Postgres, Auth and Storage. Not wired into the web app yet (see `.kiro/specs/ingestion`). Copy `.env.example` to `.env.local` and fill in your own values. Never commit `.env*` files.
+- `supabase`: real Postgres, Auth and Storage; this is what the live site runs. Copy `.env.example` to `.env.local` and fill in your own values. Never commit `.env*` files.
 
 Fixture mode acts as a signed-in user called `fixture-user`. Send the header `x-fixture-user: anonymous` to see the signed-out view, or any other name to act as another user. The public demo project is read-only. To get something you can edit, create a project with `copyFromDemo: true`.
 
