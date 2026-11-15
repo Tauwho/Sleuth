@@ -74,6 +74,23 @@ test("the whole demo path runs with no API call and no other host, and survives 
   expect(net.foreign).toEqual([]);
 });
 
+test("an uploaded video plays from the tab and is sent nowhere (N4)", async ({ page }) => {
+  test.setTimeout(120_000);
+  const net = watchNetwork(page);
+  await page.goto("/projects/proofpay-demo");
+  await page.getByRole("button", { name: "Make an editable copy" }).first().click();
+  await expect(page).toHaveURL(/\/projects\/proj-\d+$/);
+  await openTab(page, "Upload");
+  // Our own clip, used as "your video": it is a real file the browser can read the length of.
+  await page
+    .getByLabel("Choose a video file")
+    .setInputFiles("apps/web/public/scenarios/proofpay-v1/video.mp4");
+  await expect(page.getByTestId("kept-in-tab")).toBeVisible();
+  await expect(page.locator("video")).toHaveAttribute("src", /^blob:/);
+  expect(net.api).toEqual([]);
+  expect(net.foreign).toEqual([]);
+});
+
 test("a new tab starts from the scenario, not from another tab's changes", async ({ browser }) => {
   test.setTimeout(120_000);
   const context = await browser.newContext();

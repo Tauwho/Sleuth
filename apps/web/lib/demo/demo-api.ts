@@ -60,7 +60,24 @@ export interface DemoApiOptions {
   clock?: () => number;
   /** This app's origin, to make the scenario video's URL absolute. Defaults to the page's. */
   origin?: string;
+  /** `URL.createObjectURL` and `revokeObjectURL`; tests pass fakes. */
+  objectUrls?: ObjectUrls;
 }
+
+export interface ObjectUrls {
+  create(file: Blob): string;
+  revoke(url: string): void;
+}
+
+function browserObjectUrls(): ObjectUrls {
+  return {
+    create: (file) => URL.createObjectURL(file),
+    revoke: (url) => URL.revokeObjectURL(url),
+  };
+}
+
+/** The "upload URL" demo mode hands out. Nothing is ever sent to it. */
+export const DEMO_UPLOAD_PREFIX = "demo://keep-in-tab/";
 
 export interface DemoApi {
   /** A drop-in `fetch` for the API client. Only `/api/v1` paths are answered. */
@@ -69,6 +86,11 @@ export interface DemoApi {
   reset: () => Promise<void>;
   /** Number of logged changes. For tests and the pre-flight page. */
   changeCount: () => Promise<number>;
+  /**
+   * Keep a chosen file for the video version behind a demo upload URL, so it plays in this tab.
+   * Returns false if the URL is not one of ours. Nothing is sent anywhere.
+   */
+  keepUpload: (uploadUrl: string, file: Blob) => boolean;
 }
 
 interface Route {
@@ -216,6 +238,16 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     options.origin ?? (typeof window !== "undefined" ? window.location.origin : "http://localhost");
   /** Video versions made by an upload in this session. Only scenario videos have a file to play. */
   let uploaded = new Set<string>();
+  /**
+   * Video versions whose chosen file this tab still holds, as `blob:` URLs. They live only as long
+   * as the tab: after a reload the version is still there, but with no file it gets the simulated clock.
+   */
+  const files = new Map<string, string>();
+  const objectUrls = options.objectUrls ?? browserObjectUrls();
+  const forgetFiles = () => {
+    for (const url of files.values()) objectUrls.revoke(url);
+    files.clear();
+  };
 
   let current = 0;
   let store: FixtureStore;
@@ -232,6 +264,7 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     events = [];
     pending = new Map();
     uploaded = new Set();
+    forgetFiles();
   }
 
   function save() {
@@ -323,7 +356,14 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     if (!handler) throw new StoreError("not_found", 404, "No such endpoint in demo mode.");
     const result = await handler(store, params, body as never);
     if (spec.id === "createUploadUrl") {
-      uploaded.add((result as { assetVersion: { id: string } }).assetVersion.id);
+      const r = result as { assetVersion: { id: string }; uploadUrl: string };
+      uploaded.add(r.assetVersion.id);
+      // The file never leaves the tab: the upload flow hands it to `keepUpload` instead (N4).
+      return { ...r, uploadUrl: `${DEMO_UPLOAD_PREFIX}${encodeURIComponent(r.assetVersion.id)}` };
+    }
+    if (spec.id === "getPlaybackUrl") {
+      const kept = files.get(p(params, "assetVersionId"));
+      if (kept) return { url: kept, expiresAt: new Date(current + 24 * 60 * 60_000).toISOString() };
     }
     if (
       spec.id === "getPlaybackUrl" &&
@@ -455,5 +495,14 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
         fresh();
       }),
     changeCount: () => serial(async () => events.length),
+    keepUpload: (uploadUrl, file) => {
+      if (!uploadUrl.startsWith(DEMO_UPLOAD_PREFIX)) return false;
+      const id = decodeURIComponent(uploadUrl.slice(DEMO_UPLOAD_PREFIX.length));
+      if (!uploaded.has(id)) return false;
+      const old = files.get(id);
+      if (old) objectUrls.revoke(old);
+      files.set(id, objectUrls.create(file));
+      return true;
+    },
   };
 }
