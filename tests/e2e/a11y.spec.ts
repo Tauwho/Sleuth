@@ -23,7 +23,10 @@ const lantern = (page: Page) => page.locator("section[aria-labelledby='lantern-h
 
 async function openCopy(page: Page, request: APIRequestContext) {
   const res = await request.post("/api/v1/projects", {
-    data: { name: `A11y copy ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, copyFromDemo: true },
+    data: {
+      name: `A11y copy ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      copyFromDemo: true,
+    },
   });
   expect(res.status()).toBe(201);
   const id = ((await res.json()) as { project: { id: string } }).project.id;
@@ -41,7 +44,9 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       expect(await seriousViolations(page)).toEqual([]);
     });
 
-    test("the demo workspace with the Lantern open has no serious or critical issues", async ({ page }) => {
+    test("the demo workspace with the Lantern open has no serious or critical issues", async ({
+      page,
+    }) => {
       await page.goto("/projects/proofpay-demo");
       await marker(page, 5).click();
       await expect(lantern(page)).toContainText("Footage cannot prove this.");
@@ -61,6 +66,45 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
   });
 }
 
+// N6: the screens added after the submission.
+test.describe("axe, new screens", () => {
+  test("the blank-project form and its busy state have no serious or critical issues", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const name = page.getByLabel("Project name");
+    await expect(name).toBeVisible();
+    await name.fill("A11y blank project");
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+
+  test("the delete confirmation has no serious or critical issues", async ({ page, request }) => {
+    await openCopy(page, request);
+    await page.getByRole("button", { name: "Delete project" }).click();
+    await expect(page.getByRole("group", { name: "Confirm delete" })).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+
+  test("the job stages and the notify button have no serious or critical issues", async ({
+    page,
+    request,
+  }) => {
+    // Its own fixture user, so the daily analysis limit of other specs is not touched.
+    const user = `a11y-stages-${Date.now()}`;
+    await page.setExtraHTTPHeaders({ "x-fixture-user": user });
+    const res = await request.post("/api/v1/projects", {
+      headers: { "x-fixture-user": user },
+      data: { name: "A11y stages", copyFromDemo: true },
+    });
+    const id = ((await res.json()) as { project: { id: string } }).project.id;
+    await page.goto(`/projects/${id}`);
+    await page.getByRole("tab", { name: "Analysis", exact: true }).click();
+    await page.getByRole("button", { name: "Run analysis" }).click();
+    await expect(page.getByRole("list", { name: "Analysis progress" })).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+});
+
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
@@ -73,7 +117,11 @@ test.describe("reduced motion", () => {
       Array.from(document.querySelectorAll<HTMLElement>("*"))
         .filter((el) => {
           const cs = getComputedStyle(el);
-          return cs.animationName !== "none" && cs.display !== "none" && cs.animationPlayState === "running";
+          return (
+            cs.animationName !== "none" &&
+            cs.display !== "none" &&
+            cs.animationPlayState === "running"
+          );
         })
         .map((el) => el.className.toString().slice(0, 60)),
     );
@@ -100,7 +148,11 @@ test.describe("contrast theme (forced colors)", () => {
     expect(await borderStyle(1, line)).toBe("solid");
     const playhead = await page.getByTestId("playhead").evaluate((el) => {
       const cs = getComputedStyle(el);
-      return { width: parseFloat(cs.borderLeftWidth), color: cs.borderLeftColor, page: getComputedStyle(document.body).backgroundColor };
+      return {
+        width: parseFloat(cs.borderLeftWidth),
+        color: cs.borderLeftColor,
+        page: getComputedStyle(document.body).backgroundColor,
+      };
     });
     expect(playhead.width).toBeGreaterThan(0);
     expect(playhead.color).not.toBe(playhead.page);
@@ -154,7 +206,10 @@ test("the main keyboard path works without a mouse", async ({ page }) => {
   expect(ring.width).toBeGreaterThanOrEqual(2);
 });
 
-test("review actions are reachable and usable from the keyboard on a copy", async ({ page, request }) => {
+test("review actions are reachable and usable from the keyboard on a copy", async ({
+  page,
+  request,
+}) => {
   await openCopy(page, request);
   await line(page, 2).focus();
   await page.keyboard.press("Enter");
@@ -166,7 +221,9 @@ test("review actions are reachable and usable from the keyboard on a copy", asyn
   await expect(lantern(page).getByText("Confirmed by a person.")).toBeVisible();
 });
 
-test("the 404 page is themed, has no serious or critical issues and links home", async ({ page }) => {
+test("the 404 page is themed, has no serious or critical issues and links home", async ({
+  page,
+}) => {
   const res = await page.goto("/this-page-does-not-exist");
   expect(res?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("This room is empty.");
