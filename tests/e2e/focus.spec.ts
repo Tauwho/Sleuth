@@ -73,7 +73,7 @@ for (const [label, viewport, reducedMotion] of [
   test.describe(label, () => {
     test.use({ viewport, reducedMotion });
 
-    for (const control of ["Dashboard", "Create a project"]) {
+    for (const control of ["Dashboard", "Copy the demo"]) {
       test(`shows a visible focus ring on "${control}" the moment it is focused`, async ({ page }) => {
         await page.goto("/");
         await expect(page.getByText("Public demo, read-only")).toBeVisible({ timeout: 30_000 });

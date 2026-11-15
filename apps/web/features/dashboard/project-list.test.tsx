@@ -110,6 +110,37 @@ describe("ProjectList", () => {
     expect(fetchImpl.mock.calls.filter(([u]) => String(u).endsWith("/projects"))).toHaveLength(2);
   });
 
+  it("starts a blank project with the typed name and opens it", async () => {
+    const posts: unknown[] = [];
+    const { client } = clientWith(async (url, init) => {
+      if (init?.method === "POST") {
+        posts.push(JSON.parse(String(init.body)));
+        return json({ project: { ...copy, id: "blank-1", name: "Launch video" } }, 201);
+      }
+      return url.endsWith("/findings") ? json({ findings: [] }) : json({ projects: [demo] });
+    });
+    const navigate = vi.fn();
+    render(<ProjectList client={client} navigate={navigate} />);
+    await userEvent.type(await screen.findByLabelText("Project name"), "  Launch   video ");
+    await userEvent.click(screen.getByRole("button", { name: "Start a blank project" }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/projects/blank-1"));
+    expect(posts).toEqual([{ name: "Launch video", copyFromDemo: false }]);
+  });
+
+  it("a blank project with no name gets a plain default", async () => {
+    const posts: unknown[] = [];
+    const { client } = clientWith(async (url, init) => {
+      if (init?.method === "POST") {
+        posts.push(JSON.parse(String(init.body)));
+        return json({ project: { ...copy, id: "blank-2" } }, 201);
+      }
+      return url.endsWith("/findings") ? json({ findings: [] }) : json({ projects: [demo] });
+    });
+    render(<ProjectList client={client} navigate={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Start a blank project" }));
+    await waitFor(() => expect(posts).toEqual([{ name: "My demo video", copyFromDemo: false }]));
+  });
+
   it("shows a creation error and keeps the create button usable", async () => {
     const { client } = clientWith((url, init) =>
       init?.method === "POST"
@@ -250,7 +281,7 @@ describe("ProjectList guest sign-in (Supabase mode)", () => {
     const log: string[] = [];
     const { client } = recordingClient(log);
     render(<ProjectList client={client} auth={guestAuth(log)} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Create a project" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Copy the demo" }));
     expect(await screen.findByRole("link", { name: "Copy of ProofPay demo" })).toBeInTheDocument();
     expect(log).toEqual(["sign-in", "create"]);
   });
@@ -263,11 +294,11 @@ describe("ProjectList guest sign-in (Supabase mode)", () => {
       .mockRejectedValueOnce(new GuestAuthError("anonymous_disabled"))
       .mockResolvedValueOnce(undefined);
     render(<ProjectList client={client} auth={guestAuth(log, ensure)} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Create a project" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Copy the demo" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(GUEST_AUTH_MESSAGES.anonymous_disabled);
     expect(fetchImpl.mock.calls.filter(([, i]) => i?.method === "POST")).toHaveLength(0);
 
-    await userEvent.click(screen.getByRole("button", { name: "Create a project" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy the demo" }));
     expect(await screen.findByRole("link", { name: "Copy of ProofPay demo" })).toBeInTheDocument();
     expect(log).toEqual(["sign-in", "sign-in", "create"]);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -281,7 +312,7 @@ describe("ProjectList guest sign-in (Supabase mode)", () => {
     const auth = guestAuth(log, () => gate);
     render(<ProjectList client={client} auth={auth} />);
     const user = userEvent.setup();
-    await user.dblClick(await screen.findByRole("button", { name: "Create a project" }));
+    await user.dblClick(await screen.findByRole("button", { name: "Copy the demo" }));
     const busy = await screen.findByRole("button", { name: "Starting a guest session..." });
     expect(busy).toBeDisabled();
     await user.click(busy);
@@ -300,7 +331,7 @@ describe("ProjectList guest sign-in (Supabase mode)", () => {
       </GuestAuthProvider>,
     );
     expect(await screen.findByText(/guest session in this browser only/)).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole("button", { name: "Create a project" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Copy the demo" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(GUEST_AUTH_MESSAGES.not_configured);
     expect(fetchImpl.mock.calls.filter(([, i]) => i?.method === "POST")).toHaveLength(0);
   });
@@ -317,12 +348,12 @@ describe("ProjectList guest sign-in (Supabase mode)", () => {
       signOut,
     } as unknown as GuestAuthPort;
     render(<ProjectList client={client} auth={createGuestAuth(() => port)} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Create a project" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Copy the demo" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(GUEST_AUTH_MESSAGES.failed);
     expect(fetchImpl.mock.calls.filter(([, i]) => i?.method === "POST")).toHaveLength(0);
     expect(signInAnonymously).not.toHaveBeenCalled();
     expect(signOut).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Create a project" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Copy the demo" })).toBeEnabled();
   });
 
   it("does not sign anyone in just to show the list", async () => {
