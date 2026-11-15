@@ -134,9 +134,17 @@ export const GetCoverageResponseSchema = z.object({
 export const SealProjectRequestSchema = z.object({ note: z.string().trim().max(1000).optional() });
 export const SealProjectResponseSchema = z.object({ seal: SealSchema });
 
+/** Deleting a project removes its rows and its stored videos. The demo cannot be deleted. */
+export const DeleteProjectResponseSchema = z.object({
+  deleted: z.literal(true),
+  projectId: IdSchema,
+  /** Stored video files removed. */
+  files: z.number().int().nonnegative(),
+});
+
 // ---- endpoint registry (drives OpenAPI and the API client) ----
 
-export type HttpMethod = "GET" | "POST" | "PATCH";
+export type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export interface EndpointSpec {
   id: string;
@@ -175,6 +183,14 @@ export const ENDPOINTS = [
     path: "/projects/{id}",
     summary: "Get a project with its current video, script and checklist",
     response: GetProjectResponseSchema,
+    successStatus: 200,
+  },
+  {
+    id: "deleteProject",
+    method: "DELETE",
+    path: "/projects/{id}",
+    summary: "Delete a project you own, with its stored videos",
+    response: DeleteProjectResponseSchema,
     successStatus: 200,
   },
   {

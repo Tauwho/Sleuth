@@ -690,6 +690,15 @@ export function createFixtureStore(options: FixtureStoreOptions = {}): FixtureSt
       return seal;
     },
 
+    async deleteProject(actor, projectId) {
+      const d = writable(actor, projectId);
+      // Fixture mode stores no files; count the uploaded paths storage would have held. A copy's
+      // seeded video points at the demo's placeholder, which is not this project's file.
+      const files = d.assets.filter((a) => a.storagePath.startsWith(`${projectId}/`)).length;
+      data.delete(projectId);
+      return { projectId, files };
+    },
+
     breakSeal(projectId, reason) {
       const d = data.get(projectId);
       return d ? breakSealOf(d, reason) : null;

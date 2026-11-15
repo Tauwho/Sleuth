@@ -993,6 +993,32 @@ export function createSupabaseStore(options: SupabaseStoreOptions): SupabaseStor
       });
     },
 
+    async deleteProject(actor, projectId) {
+      return db.transaction(async (tx) => {
+        // Locks the row, and refuses the demo and anyone but the owner (a stranger gets 404).
+        await writableProject(tx, actor, projectId);
+        const assets = await tx
+          .select({ path: t.assetVersions.storagePath })
+          .from(t.assetVersions)
+          .where(eq(t.assetVersions.projectId, projectId));
+        // A copy's seeded video points at the demo's placeholder: never this project's file.
+        const paths = assets.map((a) => a.path).filter((p) => p.startsWith(`${projectId}/`));
+        // Files first, as in the purge: if storage fails, the rows stay and the person can retry.
+        if (paths.length > 0) {
+          if (!storage) {
+            throw new StoreError(
+              "not_configured",
+              501,
+              "Storage is not configured, so stored files cannot be removed.",
+            );
+          }
+          for (let i = 0; i < paths.length; i += 100) await storage.remove(paths.slice(i, i + 100));
+        }
+        await tx.delete(t.projects).where(eq(t.projects.id, projectId));
+        return { projectId, files: paths.length };
+      });
+    },
+
     async purgeExpiredAnonymousProjects(at, days): Promise<PurgeResult> {
       const cutoff = retentionCutoff(at, days).toISOString();
       // Anonymous = a Supabase Auth user made by signInAnonymously(). A project whose owner is

@@ -122,6 +122,10 @@ export const HANDLERS: Record<string, Handler> = {
     project: await s.createProject(ACTOR, body),
   }),
   getProject: (s, params) => s.getProjectDetail(ACTOR, p(params, "id")),
+  deleteProject: async (s, params) => ({
+    deleted: true as const,
+    ...(await s.deleteProject(ACTOR, p(params, "id"))),
+  }),
   createUploadUrl: (s, params, body: Parameters<FixtureStore["createUploadUrl"]>[2]) =>
     s.createUploadUrl(ACTOR, p(params, "id"), body),
   getPlaybackUrl: (s, params) =>

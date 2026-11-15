@@ -107,6 +107,11 @@ export interface ProjectStore {
    * (details.blockers) while the sealing rules are not met.
    */
   sealProject(actor: Actor, projectId: string, note?: string): Promise<Seal>;
+  /**
+   * Delete a project the caller owns: its stored videos first, then its rows (cascade). The demo
+   * and other people's projects cannot be deleted. Returns the number of files removed.
+   */
+  deleteProject(actor: Actor, projectId: string): Promise<{ projectId: string; files: number }>;
   getReportData(actor: Actor, projectId: string): Promise<ReportData>;
 }
 
