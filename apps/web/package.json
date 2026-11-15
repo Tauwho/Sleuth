@@ -12,6 +12,8 @@
         "@sleuth/contracts": "workspace:*",
         "@sleuth/db": "workspace:*",
         "@sleuth/domain": "workspace:*",
+    "@sleuth/evidence-engine": "workspace:*",
+    "@sleuth/media": "workspace:*",
         "@supabase/ssr": "0.12.7",
         "@supabase/supabase-js": "2.119.0",
         "class-variance-authority": "0.7.1",

@@ -7,7 +7,13 @@ import {
   type SessionVerifier,
 } from "./supabase-server";
 
-export type DataMode = "fixture" | "supabase";
+/**
+ * - `fixture` (default): the golden fixture in this server's memory.
+ * - `supabase`: Postgres, Auth and Storage.
+ * - `demo`: the browser answers every API call itself from a scenario (ADR 0010). If something
+ *   still reaches these routes, the server answers like fixture mode. It holds no keys either way.
+ */
+export type DataMode = "fixture" | "supabase" | "demo";
 
 /** Blank or invalid env values count as unset, so the store default applies. */
 function positiveInt(value: string | undefined): number | undefined {
@@ -20,7 +26,9 @@ function seconds(value: string | undefined): number | undefined {
 }
 
 export function dataMode(): DataMode {
-  return process.env.SLEUTH_DATA_MODE === "supabase" ? "supabase" : "fixture";
+  const mode = process.env.SLEUTH_DATA_MODE;
+  if (mode === "supabase" || mode === "demo") return mode;
+  return "fixture";
 }
 
 const limits = () => ({

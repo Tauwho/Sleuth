@@ -13,7 +13,8 @@ export function createBrowserGuestAuth(
   config: ClientAuthConfig,
   createClient: typeof createBrowserClient = createBrowserClient,
 ): GuestAuth {
-  if (config.mode === "fixture") return createFixtureGuestAuth();
+  // Demo mode answers every call in the browser (ADR 0010), so it needs no sign-in either.
+  if (config.mode !== "supabase") return createFixtureGuestAuth();
   const { url, anonKey } = config;
   if (!url || !anonKey) return createGuestAuth(null);
   return createGuestAuth((): GuestAuthPort => createClient(url, anonKey).auth);

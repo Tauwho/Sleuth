@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { EvidenceCandidate, Finding, ProcessingJob } from "@sleuth/contracts";
+import { useDemoApi } from "@/components/guest-auth-provider";
 import { ProcessingState } from "@/components/state-panel";
 import { Button } from "@/components/ui/button";
 import { useJobPoll } from "./use-job-poll";
@@ -29,6 +30,12 @@ const STATUS_TEXT: Record<"queued" | "running", string> = {
   running: "Analysis running.",
 };
 
+/** Demo mode replays a saved run in a few seconds (ADR 0010), so it says so instead. */
+const DEMO_STATUS_TEXT: Record<"queued" | "running", string> = {
+  queued: "Queued. Demo mode replays a saved run in a few seconds.",
+  running: "Analysis running (saved run).",
+};
+
 /** Items a person still has to look at: AI candidates not yet decided, and open findings. */
 function needsPerson(evidence: readonly EvidenceCandidate[], findings: readonly Finding[]) {
   return {
@@ -50,6 +57,8 @@ export function AnalysisPanel({
   onSucceeded,
   intervalMs,
 }: AnalysisPanelProps) {
+  const demo = useDemoApi() !== null;
+  const statusText = demo ? DEMO_STATUS_TEXT : STATUS_TEXT;
   const { job, checkError, watch } = useJobPoll({ fetchJob, onSucceeded, intervalMs });
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | undefined>(undefined);
@@ -93,8 +102,9 @@ export function AnalysisPanel({
       </p>
 
       <p className="mt-2 text-xs text-muted" data-testid="analysis-limits">
-        Free-tier limits: a video up to 50 MB and 3 minutes, and a small number of analyses per account each day
-        (5 by default). If you reach the limit, this page tells you when it resets.
+        {demo
+          ? "Demo mode: the analysis runs the real matching on a saved transcript and saved frames, in this browser."
+          : "Free-tier limits: a video up to 50 MB and 3 minutes, and a small number of analyses per account each day (5 by default). If you reach the limit, this page tells you when it resets."}
       </p>
 
       {readOnly ? (
@@ -109,12 +119,14 @@ export function AnalysisPanel({
         {job && active ? (
           <div data-testid="job-processing">
             <ProcessingState
-              statusText={`${STATUS_TEXT[job.status as "queued" | "running"]} Attempt ${job.attempts} of ${job.maxAttempts}.`}
+              statusText={`${statusText[job.status as "queued" | "running"]} Attempt ${job.attempts} of ${job.maxAttempts}.`}
             />
-            <p className="mt-2 text-xs text-muted">
-              The real job state is checked every 2 seconds. You can leave this page and come back; the result
-              is kept. If no worker is running (fixture mode in the web app has none), the job stays queued.
-            </p>
+            {demo ? null : (
+              <p className="mt-2 text-xs text-muted">
+                The real job state is checked every 2 seconds. You can leave this page and come back; the result
+                is kept. If no worker is running (fixture mode in the web app has none), the job stays queued.
+              </p>
+            )}
           </div>
         ) : null}
         {job && job.status === "queued" && now > 0 && now - Date.parse(job.createdAt) > STALLED_AFTER_MS ? (

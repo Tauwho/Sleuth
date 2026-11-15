@@ -19,6 +19,7 @@
     "test": "vitest run --exclude \"**/*.property.test.ts\" --exclude \"**/node_modules/**\" --exclude \"tests/e2e/**\"",
     "test:property": "vitest run .property.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:demo": "playwright test -c playwright.demo.config.ts",
     "eval": "tsx tests/evaluation/run.ts",
     "build": "pnpm -r --if-present build",
     "check:contracts": "vitest run tests/contract && tsx scripts/generate-openapi.ts --check",
