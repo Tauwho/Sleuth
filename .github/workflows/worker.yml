@@ -42,6 +42,11 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # For the local Whisper fallback (step 11). Installed with pip only if a job needs it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       # Tesseract reads visitors' on-screen text on this runner (step 8): nothing leaves it.
       - run: (command -v ffmpeg >/dev/null && command -v tesseract >/dev/null) || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng)
 
@@ -64,6 +69,8 @@ jobs:
           VIDEO_ANALYSIS_MODEL: gemini-3.6-flash
           # Jobs that may not send frames (visitors, D-4) read on-screen text locally instead.
           LOCAL_OCR: tesseract
+          # If Deepgram fails (credit used up, outage), transcribe on this runner instead.
+          TRANSCRIPTION_FALLBACK: whisper
           MAX_VIDEO_BYTES: "52428800"
           # Guest projects and their videos go after 1 day, not 7, so the 1 GB free storage
           # cannot fill up (step 6 of the product plan; ADR 0008 amendment in docs/deploy-plan.md).

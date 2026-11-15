@@ -21,6 +21,13 @@ const EnvSchema = z.object({
    */
   LOCAL_OCR: z.enum(["none", "tesseract"]).default("none"),
   /**
+   * `whisper`: when the hosted transcription fails (no credit, rate limit, outage), transcribe on
+   * this machine with faster-whisper instead (step 11). It installs itself with pip on first use.
+   */
+  TRANSCRIPTION_FALLBACK: z.enum(["none", "whisper"]).default("none"),
+  /** faster-whisper model for the fallback. `base.en` is a fair speed and accuracy trade on a CPU. */
+  WHISPER_MODEL: z.string().default("base.en"),
+  /**
    * With `VIDEO_ANALYSIS_PROVIDER=gemini`: the only project owners whose frames may go to Gemini,
    * comma separated user ids. Our own team accounts only, never a visitor. Empty means nobody, so
    * every job is speech-only. An anonymous or unknown owner is speech-only even when listed.
