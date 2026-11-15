@@ -6,7 +6,7 @@ import {
   type ErrorResponse,
 } from "@sleuth/contracts";
 import { StoreError, type Actor, type ProjectStore } from "@sleuth/db/fixture";
-import { getStore, resolveActor } from "./data-source";
+import { getStore, holdStore, releaseStore, resolveActor } from "./data-source";
 
 export class ApiError extends Error {
   constructor(
@@ -116,6 +116,7 @@ export function endpoint<K extends EndpointId>(id: K, run: (ctx: Ctx<K>) => Prom
     req: Request,
     routeCtx: { params: Promise<Record<string, string>> },
   ): Promise<Response> => {
+    holdStore();
     try {
       const params = await routeCtx.params;
       const actor = await resolveActor(req);
@@ -145,6 +146,10 @@ export function endpoint<K extends EndpointId>(id: K, run: (ctx: Ctx<K>) => Prom
       return Response.json(spec.response?.parse(result), { status: spec.successStatus, headers });
     } catch (err) {
       return toErrorResponse(err);
+    } finally {
+      // Close the database pool before the instance can be frozen (N5). Awaited on purpose: an
+      // unawaited close may never finish once the response has gone.
+      await releaseStore();
     }
   };
 }

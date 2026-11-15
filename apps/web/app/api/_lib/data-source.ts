@@ -90,6 +90,43 @@ const notConfigured = (what: string) =>
     `Supabase mode needs ${what}. Unset SLEUTH_DATA_MODE to use the fixture.`,
   );
 
+type PoolClient = ReturnType<typeof createDb>["client"];
+const poolState = globalThis as unknown as { __sleuthPool?: PoolClient; __sleuthInFlight?: number };
+
+function openPool(url: string) {
+  const { db, client } = createDb(webDatabaseUrl(url, process.env.SLEUTH_DB_POOL_MODE), {
+    // 2, not 1: a query outside a transaction must never wait for that transaction.
+    max: 2,
+    idleTimeoutSeconds: 2,
+  });
+  poolState.__sleuthPool = client;
+  return db;
+}
+
+/** Call when a request starts using the store. Pair every call with `releaseStore`. */
+export function holdStore(): void {
+  poolState.__sleuthInFlight = (poolState.__sleuthInFlight ?? 0) + 1;
+}
+
+/**
+ * Call when a request is done with the store. When it was the last one in flight, the Supabase
+ * pool is closed and the store dropped, so a frozen instance holds no pooler client. The next
+ * request opens a new pool. Never throws.
+ */
+export async function releaseStore(): Promise<void> {
+  poolState.__sleuthInFlight = Math.max(0, (poolState.__sleuthInFlight ?? 1) - 1);
+  if (poolState.__sleuthInFlight > 0 || dataMode() !== "supabase") return;
+  const pool = poolState.__sleuthPool;
+  if (!pool) return;
+  poolState.__sleuthPool = undefined;
+  globalForStore.__sleuthSupabaseStore = undefined;
+  try {
+    await pool.end({ timeout: 2 });
+  } catch {
+    // Closing failed; the connections time out on their own.
+  }
+}
+
 /** The store for the current data mode. */
 export function getStore(): ProjectStore {
   if (dataMode() === "supabase") {
@@ -97,17 +134,12 @@ export function getStore(): ProjectStore {
       const url = process.env.DATABASE_URL?.trim();
       if (!url) throw notConfigured("DATABASE_URL");
       globalForStore.__sleuthSupabaseStore = createSupabaseStore({
-        // Each Vercel instance holds at most 2 connections and frees them after 2 idle seconds (N5).
-        // The session pooler allows 15 clients in total. On 14 Nov, three warm instances with 5 each
-        // filled it (EMAXCONNSESSION). On 15 Nov, after each redeploy, the old deployment's frozen
-        // instances still held their clients for minutes, so the new ones got 500 on every read.
-        // A 2 s idle limit closes a connection before an instance is frozen, at the cost of a
-        // reconnect for the next request.
-        db: createDb(webDatabaseUrl(url, process.env.SLEUTH_DB_POOL_MODE), {
-          // 2, not 1: a query outside a transaction must never wait for that transaction.
-          max: 2,
-          idleTimeoutSeconds: 2,
-        }).db,
+        // At most 2 connections per instance, and the whole pool is closed as soon as no request
+        // is in flight (`releaseStore`, N5). The session pooler allows 15 clients in total. After
+        // each redeploy on 15 Nov, the old deployment's frozen instances kept their clients open
+        // (an idle timer never fires in a frozen instance), so the new ones got `XX000` (max
+        // clients) on every read for minutes. The cost is one reconnect per burst of requests.
+        db: openPool(url),
         storage: storageFromEnv() ?? undefined,
         ...limits(),
         guards: guardsFromEnv(process.env, true),
