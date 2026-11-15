@@ -53,6 +53,40 @@ jobs:
         env:
           SLEUTH_DATA_MODE: fixture
 
+  # Browser specs in Chromium (N2): fixture mode (tests/e2e) and demo mode (tests/e2e-demo). Each
+  # config starts its own dev server; workers are 1 on CI. Failed runs keep traces as an artifact.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser specs, fixture mode
+        run: pnpm exec playwright test --project=chromium
+
+      - name: Browser specs, demo mode
+        run: pnpm test:e2e:demo
+
+      - name: Keep traces of failed specs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
   # The Postgres, Auth and Storage suites (ingestion 5 to 10, change-impact 9) against a throwaway
   # local Supabase stack. It is created for this run and destroyed with the runner, so it never
   # touches the team's dev project. The keys it prints are the CLI's fixed local demo keys.
