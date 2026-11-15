@@ -126,7 +126,7 @@ See `.kiro/steering/architecture.md` for the dependency rules.
 ## Data modes
 
 - `fixture` (default): in-memory golden fixture. Works offline.
-- `demo`: the browser answers every API call itself from a scenario, with no network, no keys and no database. Each tab has its own state, kept in sessionStorage. Analyses replay a saved run on a fixed timeline, so a recording looks the same every time (ADR 0010). Try it: `$env:SLEUTH_DATA_MODE="demo"; pnpm dev`. Browser test: `pnpm test:e2e:demo`.
+- `demo`: the browser answers every API call itself from a scenario, with no network, no keys and no database. Each tab has its own state, kept in sessionStorage. Analyses replay a saved run on a fixed timeline, so a recording looks the same every time (ADR 0010). Try it: `$env:SLEUTH_DATA_MODE="demo"; pnpm dev`. Browser test: `pnpm test:e2e:demo`. Before recording, open `/demo/preflight`: it checks the scenario, the video, the fonts, the window size and a clean tab, then "Reset and start recording" opens the recording view (`?rec=1`: no animations, no reset button; `?rec=0` leaves it). "Reset demo" in the banner forgets this tab's changes.
 - `supabase`: real Postgres, Auth and Storage. Not wired into the web app yet (see `.kiro/specs/ingestion`). Copy `.env.example` to `.env.local` and fill in your own values. Never commit `.env*` files.
 
 Fixture mode acts as a signed-in user called `fixture-user`. Send the header `x-fixture-user: anonymous` to see the signed-out view, or any other name to act as another user. The public demo project is read-only. To get something you can edit, create a project with `copyFromDemo: true`.
