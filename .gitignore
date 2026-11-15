@@ -17,6 +17,8 @@ next-env.d.ts
 *.mp4
 *.mov
 *.webm
+# Demo scenario clips are our own generated media (scripts/make-scenario-clip.ps1, ADR 0010).
+!apps/web/public/scenarios/**/*.mp4
 .sleuth-out/
 
 # tests
