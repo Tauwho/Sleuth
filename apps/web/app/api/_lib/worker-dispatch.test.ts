@@ -34,7 +34,7 @@ describe("requestWorkerRun", () => {
     expect(s.fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = s.fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(
-      "https://api.github.com/repos/dngvmnh/sleuth/actions/workflows/worker.yml/dispatches",
+      "https://api.github.com/repos/Tauwho/Sleuth/actions/workflows/worker.yml/dispatches",
     );
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ ref: "main" });

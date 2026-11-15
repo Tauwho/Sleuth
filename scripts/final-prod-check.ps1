@@ -94,7 +94,7 @@ try {
             Write-Host "The server did not start the worker ($word)." -ForegroundColor Yellow
             Write-Host "1. Supabase, sleuth-prod, SQL Editor: run the read-only queue check from the top of scripts/prod-e2e.ts."
             Write-Host "2. Only if it shows exactly one row, named zz-test-e2e-..., with queued 1 and running 0, run in a second window:"
-            Write-Host "   gh workflow run worker.yml --repo dngvmnh/sleuth"
+            Write-Host "   gh workflow run worker.yml --repo Tauwho/Sleuth"
             Write-Host "3. Do not start it for any other row. This window keeps waiting for the job."
             Write-Host ""
           }

@@ -72,7 +72,7 @@ MIT, see [LICENSE](LICENSE).
 You need Node 22 and Git. Run everything in PowerShell on a normal Windows folder, not inside WSL. On macOS the same commands work in a normal terminal (use `;` or newlines, not `&&` chains, if you copy the PowerShell ones).
 
 ```powershell
-git clone https://github.com/dngvmnh/sleuth
+git clone https://github.com/Tauwho/Sleuth
 cd sleuth
 npm install -g pnpm@10.12.1   # or: corepack enable
 pnpm install

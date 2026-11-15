@@ -28,7 +28,7 @@ concurrency:
 jobs:
   ping:
     # Only the team's repository; never a fork.
-    if: github.repository == 'dngvmnh/sleuth'
+    if: github.repository == 'Tauwho/Sleuth'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -81,7 +81,7 @@ Risk: anyone with write access to the repo can read these secrets through a work
 
 ### 3. Web on Vercel Hobby
 
-What you click: vercel.com, Add New, Project, import `dngvmnh/sleuth`. Root directory: `apps/web`. Framework: Next.js. Install command: `pnpm install --frozen-lockfile`.
+What you click: vercel.com, Add New, Project, import `Tauwho/Sleuth`. Root directory: `apps/web`. Framework: Next.js. Install command: `pnpm install --frozen-lockfile`.
 
 Environment variables (Production):
 
@@ -97,13 +97,13 @@ Environment variables (Production):
 | `DAILY_ANALYSIS_LIMIT_PER_USER` | `5` | no |
 | `MAX_VIDEO_SECONDS` | `180` | no |
 | `MAX_VIDEO_BYTES` | `52428800` | no |
-| `WORKER_DISPATCH_TOKEN` | fine-grained GitHub token, `dngvmnh/sleuth` only, "Actions: Read and write" only (ADR 0009 amendment) | yes, server only; **Production only**, never Preview |
+| `WORKER_DISPATCH_TOKEN` | fine-grained GitHub token, `Tauwho/Sleuth` only, "Actions: Read and write" only (ADR 0009 amendment) | yes, server only; **Production only**, never Preview |
 
 The web app needs no provider keys: only the worker calls Deepgram and Gemini.
 
 How to make `WORKER_DISPATCH_TOKEN`:
 1. GitHub, your avatar, Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token.
-2. Name `sleuth-worker-dispatch`. Expiration: 60 days. Resource owner: `dngvmnh`. Repository access: Only select repositories, `dngvmnh/sleuth`.
+2. Name `sleuth-worker-dispatch`. Expiration: 60 days. Resource owner: `Tauwho` (the repository's owner since it moved from `dngvmnh/sleuth`; only that account can make a fine-grained token for it). Repository access: Only select repositories, `Tauwho/Sleuth`.
 3. Permissions, Repository permissions: Actions, Read and write. Leave every other permission at No access. Generate, copy it.
 4. Vercel, the project, Settings, Environment Variables, Add: key `WORKER_DISPATCH_TOKEN`, paste the value, tick **Production** only, mark it Sensitive, Save.
 5. Deployments, the latest Production deployment, Redeploy, so the new variable is read.
@@ -120,14 +120,14 @@ How to see whether the start worked (no secret is shown anywhere):
 | `skipped_recent` | The same server started a run less than 60 s ago | Nothing; that run takes every queued job |
 | `refused` with status 401 | Token wrong, revoked or expired | Check 1 |
 | `refused` with status 403 | Token lacks "Actions: Read and write" | Check 3 |
-| `refused` with status 404 | Token cannot see `dngvmnh/sleuth` | Check 2 |
+| `refused` with status 404 | Token cannot see `Tauwho/Sleuth` | Check 2 |
 | `refused` with status 422 | GitHub refused the ref or the workflow | `worker.yml` on `main` must keep `workflow_dispatch` |
 | `failed` | Network error or no answer in 3 s | Run it again |
 | `not_queued` | The job was already running or finished | Nothing |
 
 Checks for the token:
 1. GitHub, Settings, Developer settings, Fine-grained tokens, `sleuth-worker-dispatch`: status active, expiry in the future. If unsure, Regenerate token and paste the new value in Vercel.
-2. Same page, Repository access: "Only select repositories" with `dngvmnh/sleuth`. Resource owner `dngvmnh`.
+2. Same page, Repository access: "Only select repositories" with `Tauwho/Sleuth`. Resource owner `Tauwho`.
 3. Same page, Repository permissions: Actions "Read and write". Metadata "Read-only" is added by GitHub. Nothing else is needed.
 4. Vercel, the project, Settings, Environment Variables: the key is exactly `WORKER_DISPATCH_TOKEN`, and **Production** is ticked.
 5. Vercel, Deployments: the current Production deployment was created **after** the variable was saved. A variable reaches only new deployments. If not, open the latest Production deployment, then the menu, then Redeploy.
@@ -137,7 +137,7 @@ Deploy, then open the public demo signed out. It must load without a login.
 ### 4. Smoke test after each deploy
 1. Signed out: the demo project, its evidence and the report open.
 2. "Try your own video": anonymous sign-in, create a project, upload a short clip, start analysis.
-3. Wait for the scheduled worker (10 to 15 minutes), or start it now: `gh workflow run worker.yml --repo dngvmnh/sleuth`. The job reaches `succeeded`.
+3. Wait for the scheduled worker (10 to 15 minutes), or start it now: `gh workflow run worker.yml --repo Tauwho/Sleuth`. The job reaches `succeeded`.
 4. A second browser cannot see the first browser's project.
 
 ### 5. Production check, 10 November 2026 (`https://sleuth-eight.vercel.app`)
@@ -187,7 +187,7 @@ In guest mode, speech alone gives screen claims no candidate. So step 7 is SKIP 
 Order of work:
 1. Run the queue check; it must return no rows.
 2. Start the script.
-3. When it prints "analysis queued", run the queue check again. The scheduled worker takes the job within 10 to 15 minutes; you do not have to start it. If you want it sooner, run `gh workflow run worker.yml --repo dngvmnh/sleuth`. Only test projects (`zz-test-e2e-...`) should be queued while you rehearse, so a visitor's job is not mixed in.
+3. When it prints "analysis queued", run the queue check again. The scheduled worker takes the job within 10 to 15 minutes; you do not have to start it. If you want it sooner, run `gh workflow run worker.yml --repo Tauwho/Sleuth`. Only test projects (`zz-test-e2e-...`) should be queued while you rehearse, so a visitor's job is not mixed in.
 4. After the run, delete the printed project by id (`docs/coordination/cleanup.md`).
 
 Rehearsal on sleuth-dev, 14 November 2026: a local worker with the production settings (gemini, empty owner list) and a guest. Result: worker `speechOnly=1`, "speech-only findings: 2 of 2", 9 PASS, 1 SKIP (step 7), 0 secrets or transcript strings in the output.
@@ -207,7 +207,7 @@ powershell -ExecutionPolicy Bypass -File scripts/final-prod-check.ps1 -SmokeOnly
 | 1 | Asks for the production Project URL and publishable key, unless you pass `-ProjectUrl` and `-PublishableKey`. Both are public (they are in the page). It never reads `.env.local`, so it cannot reach dev. |
 | 2 | Runs `scripts/prod-smoke.ts`, parts A and B. |
 | 3 | Unless `-SmokeOnly`: builds the evidence clip with `scripts/make-evidence-clip.ps1` if `-Clip` (default `%TEMP%\sleuth-evidence-clip.mp4`) is missing. Asks for the team e-mail and password (`Read-Host -AsSecureString`). Then runs `scripts/prod-e2e.ts` in team-account mode. |
-| 4 | Shows the `worker dispatch:` word. If it is not `sent`, it tells you to run the read-only queue check first, and to run `gh workflow run worker.yml --repo dngvmnh/sleuth` only if the one row is the script's job. |
+| 4 | Shows the `worker dispatch:` word. If it is not `sent`, it tells you to run the read-only queue check first, and to run `gh workflow run worker.yml --repo Tauwho/Sleuth` only if the one row is the script's job. |
 | 5 | Removes every environment variable it set, in a `finally` block, even after an error. |
 | 6 | Prints the test project ids, the select-first SQL to delete them, and the Storage folders to delete in the dashboard (folder name = project id). |
 
@@ -285,7 +285,7 @@ The three test projects of that run (`zz-test-ec48xl`, `zz-test-836d6a`, `zz-tes
 
 **The pausing rule (Supabase):** Free plan projects that show low activity over a 7-day period are paused to save server resources. Typically a few user requests to the database each day over the previous week are enough to prevent pausing ([Project Pausing](https://supabase.com/docs/guides/platform/free-project-pausing), read 13 November 2026). Supabase emails the owner about a week before a pause. A paused project can be restored from the dashboard (Resume project) for up to 1 year (same page).
 
-**What we do:** `.github/workflows/keep-alive.yml` runs one read-only query (`select count(*) from projects where is_demo`) against `sleuth-prod` on Mondays and Thursdays at 03:17 UTC, plus a manual run. It uses the existing `DATABASE_URL` secret and runs only on `dngvmnh/sleuth`. The query runs in `scripts/keep-alive.ts`, which uses the worker's own driver and options (postgres.js through `@sleuth/db`, `prepare: false`, one connection, 20 s limit). An earlier version used `psql`, which failed on the same secret with exit code 2 and hid the reason.
+**What we do:** `.github/workflows/keep-alive.yml` runs one read-only query (`select count(*) from projects where is_demo`) against `sleuth-prod` on Mondays and Thursdays at 03:17 UTC, plus a manual run. It uses the existing `DATABASE_URL` secret and runs only on `Tauwho/Sleuth`. The query runs in `scripts/keep-alive.ts`, which uses the worker's own driver and options (postgres.js through `@sleuth/db`, `prepare: false`, one connection, 20 s limit). An earlier version used `psql`, which failed on the same secret with exit code 2 and hid the reason.
 
 It prints only `ok` or `error <category>`. The category is read from the error's code or name, never from its text:
 
