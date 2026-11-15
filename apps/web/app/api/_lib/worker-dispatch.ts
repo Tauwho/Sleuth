@@ -23,7 +23,7 @@ export interface DispatchOptions {
 }
 
 /** Repository and workflow to start. Fixed: this app only ever starts its own worker. */
-const REPO = "dngvmnh/sleuth";
+const REPO = "Tauwho/Sleuth";
 const WORKFLOW = "worker.yml";
 /** One start per server instance per minute is enough; a started run takes every queued job. */
 export const DISPATCH_MIN_INTERVAL_MS = 60_000;

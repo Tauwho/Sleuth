@@ -29,7 +29,7 @@ permissions:
 jobs:
   run:
     # Only on the main repository, so a fork never runs with our secrets.
-    if: github.repository == 'dngvmnh/sleuth'
+    if: github.repository == 'Tauwho/Sleuth'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

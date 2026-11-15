@@ -57,7 +57,7 @@ describe("scripts/final-prod-check.ps1", () => {
   it("tells the operator to run the queue check before a manual worker start", () => {
     expect(code).toMatch(/worker dispatch:/);
     expect(code).toMatch(/\$word -ne "sent"/);
-    expect(code).toMatch(/queue check[\s\S]*gh workflow run worker\.yml --repo dngvmnh\/sleuth/);
+    expect(code).toMatch(/queue check[\s\S]*gh workflow run worker\.yml --repo Tauwho\/Sleuth/);
   });
 
   it("ends with the ids, the select-first SQL and the Storage folders", () => {
