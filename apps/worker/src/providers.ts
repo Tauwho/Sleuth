@@ -1,9 +1,14 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { JobOwner } from "@sleuth/db";
 import { loadGoldenFixture } from "@sleuth/db/fixture";
 import {
   createDeepgramTranscription,
   createGeminiVideoAnalysis,
   createTesseractVideoAnalysis,
+  createFallbackTranscription,
+  createWhisperTranscription,
+  pipEnsure,
   type ProviderUsage,
   type TranscriptionProvider,
   type VideoAnalysisProvider,
@@ -70,7 +75,7 @@ export type ProviderConfig = Pick<
   | "ALLOW_MOCK_PROVIDERS"
   | "MAX_FRAMES_PER_VIDEO"
 > &
-  Partial<Pick<WorkerConfig, "LOCAL_OCR">> &
+  Partial<Pick<WorkerConfig, "LOCAL_OCR" | "TRANSCRIPTION_FALLBACK" | "WHISPER_MODEL">> &
   Partial<
     Pick<
       WorkerConfig,
@@ -103,12 +108,37 @@ export function geminiFramesAllowed(owner: JobOwner, ownerIds: readonly string[]
 export function createProviders(
   config: ProviderConfig,
   onUsage?: (usage: ProviderUsage) => void,
+  /** Called with the hosted provider's error code when a job falls back to local Whisper. */
+  onFallback?: (code: string) => void,
 ): ProviderSet {
-  const set = createRemoteProviders(config, onUsage);
+  const remote = createRemoteProviders(config, onUsage);
+  const set: ProviderSet =
+    config.TRANSCRIPTION_FALLBACK === "whisper"
+      ? {
+          ...remote,
+          transcription: createFallbackTranscription(
+            remote.transcription,
+            createWhisperTranscription({
+              script: WHISPER_SCRIPT,
+              ...(config.WHISPER_MODEL ? { model: config.WHISPER_MODEL } : {}),
+              ensure: pipEnsure(),
+            }),
+            onFallback,
+          ),
+        }
+      : remote;
   return config.LOCAL_OCR === "tesseract"
     ? { ...set, localVideoAnalysis: createTesseractVideoAnalysis() }
     : set;
 }
+
+/** The local speech-to-text script (step 11), next to `src/`. */
+export const WHISPER_SCRIPT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "whisper",
+  "transcribe.py",
+);
 
 function createRemoteProviders(
   config: ProviderConfig,

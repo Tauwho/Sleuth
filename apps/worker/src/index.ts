@@ -48,12 +48,16 @@ async function main() {
   }
 
   // Fail at start-up, not job by job, when the providers are not usable (evidence-analysis 2.1).
-  const providers = createProviders(config, (usage) =>
-    log("provider_usage", {
-      provider: usage.provider,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-    }),
+  const providers = createProviders(
+    config,
+    (usage) =>
+      log("provider_usage", {
+        provider: usage.provider,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+      }),
+    // The hosted provider failed and local Whisper takes over (step 11). The code only.
+    (code) => log("transcription_fallback", { from: config.TRANSCRIPTION_PROVIDER, code }),
   );
   if (config.ALLOW_MOCK_PROVIDERS)
     log("mock_providers", { warning: "results are not a real analysis" });
