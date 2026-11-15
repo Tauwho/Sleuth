@@ -157,3 +157,42 @@ export function retentionCutoff(now: Date, days: number): Date {
   if (!Number.isFinite(days) || days < 0) throw new RangeError("days must be zero or more");
   return new Date(now.getTime() - days * 86_400_000);
 }
+
+/**
+ * Abuse guards (step 6 of the product plan). They protect the free-tier storage (1 GB) and the
+ * transcription credit from a script that makes guest after guest. Every field is optional:
+ * unset means no limit, which is what tests and the fixture defaults use. The web app sets them
+ * from the environment (`app/api/_lib/data-source.ts`).
+ */
+export interface GuardOptions {
+  /** Projects one anonymous guest may own at once. */
+  maxProjectsPerGuest?: number;
+  /** Videos one anonymous guest may upload across the projects they still own. */
+  maxUploadsPerGuest?: number;
+  /** Analyses everyone together may start per UTC day. */
+  globalDailyAnalysisLimit?: number;
+}
+
+export const guestProjectLimit = (limit: number) =>
+  new StoreError(
+    "project_limit",
+    429,
+    `A guest can keep ${limit} projects. Wait for old guest projects to be removed after a day, or sign up.`,
+    { limit },
+  );
+
+export const guestUploadLimit = (limit: number) =>
+  new StoreError(
+    "upload_limit",
+    429,
+    `A guest can upload ${limit} videos. Guest projects are removed after a day, and then you can upload again.`,
+    { limit },
+  );
+
+export const globalAnalysisLimit = (limit: number, resetsAtMs: number) =>
+  new StoreError(
+    "global_limit",
+    429,
+    "Today's free analyses for everyone are used up. Try again after the reset time.",
+    { limit, resetsAt: new Date(resetsAtMs).toISOString() },
+  );

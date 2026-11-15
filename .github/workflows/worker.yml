@@ -62,3 +62,6 @@ jobs:
           VIDEO_ANALYSIS_API_KEY: ${{ secrets.VIDEO_ANALYSIS_API_KEY }}
           VIDEO_ANALYSIS_MODEL: gemini-3.6-flash
           MAX_VIDEO_BYTES: "52428800"
+          # Guest projects and their videos go after 1 day, not 7, so the 1 GB free storage
+          # cannot fill up (step 6 of the product plan; ADR 0008 amendment in docs/deploy-plan.md).
+          ANONYMOUS_RETENTION_DAYS: "1"

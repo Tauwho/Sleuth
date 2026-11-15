@@ -1,5 +1,11 @@
 import { createDb } from "@sleuth/db";
-import { createFixtureStore, StoreError, type Actor, type ProjectStore } from "@sleuth/db/fixture";
+import {
+  createFixtureStore,
+  StoreError,
+  type Actor,
+  type GuardOptions,
+  type ProjectStore,
+} from "@sleuth/db/fixture";
 import { createSupabaseStore, storageFromEnv } from "@sleuth/db/supabase";
 import {
   authConfigFromEnv,
@@ -36,6 +42,20 @@ const limits = () => ({
   maxVideoMs: seconds(process.env.MAX_VIDEO_SECONDS),
 });
 
+/**
+ * Abuse guards (step 6 of the product plan). In Supabase mode they are on by default, sized for
+ * the free tiers: 2 projects and 2 uploads per anonymous guest (2 x 50 MB), and 50 analyses a day
+ * for everyone together. In fixture mode they apply only when set, so local tests are unchanged.
+ */
+export function guardsFromEnv(env: NodeJS.ProcessEnv, supabase: boolean): GuardOptions {
+  const pick = (name: string, fallback: number) => positiveInt(env[name]) ?? (supabase ? fallback : undefined);
+  return {
+    maxProjectsPerGuest: pick("MAX_PROJECTS_PER_GUEST", 2),
+    maxUploadsPerGuest: pick("MAX_UPLOADS_PER_GUEST", 2),
+    globalDailyAnalysisLimit: pick("GLOBAL_DAILY_ANALYSIS_LIMIT", 50),
+  };
+}
+
 // Keep one store across hot reloads: the fixture keeps UI edits, Supabase keeps one pool.
 const globalForStore = globalThis as unknown as {
   __sleuthFixtureStore?: ProjectStore;
@@ -63,11 +83,15 @@ export function getStore(): ProjectStore {
         db: createDb(url, { max: 2, idleTimeoutSeconds: 10 }).db,
         storage: storageFromEnv() ?? undefined,
         ...limits(),
+        guards: guardsFromEnv(process.env, true),
       });
     }
     return globalForStore.__sleuthSupabaseStore;
   }
-  globalForStore.__sleuthFixtureStore ??= createFixtureStore(limits());
+  globalForStore.__sleuthFixtureStore ??= createFixtureStore({
+    ...limits(),
+    guards: guardsFromEnv(process.env, false),
+  });
   return globalForStore.__sleuthFixtureStore;
 }
 

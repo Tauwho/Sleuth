@@ -40,7 +40,14 @@ import type {
   ReportData,
   RetentionStore,
 } from "../store";
-import { retentionCutoff, StoreError } from "../store";
+import {
+  globalAnalysisLimit,
+  guestProjectLimit,
+  guestUploadLimit,
+  retentionCutoff,
+  StoreError,
+  type GuardOptions,
+} from "../store";
 import { cloneWithPrefix } from "../clone";
 import { loadGoldenFixture } from "./load";
 
@@ -82,6 +89,8 @@ export interface FixtureStoreOptions {
    * starts with `anon-` counts as anonymous.
    */
   isAnonymousUser?: (userId: string) => boolean;
+  /** Abuse guards (step 6). Unset means no limit. */
+  guards?: GuardOptions;
 }
 
 /**
@@ -180,6 +189,23 @@ export function createFixtureStore(options: FixtureStoreOptions = {}): FixtureSt
   const golden = loadGoldenFixture();
   seed(golden, null, true);
 
+  const guards = options.guards ?? {};
+  const isAnonymous = options.isAnonymousUser ?? ((id: string) => id.startsWith("anon-"));
+  /** Events of one type across every project, optionally only by one person or only today. */
+  function countEvents(type: string, actorId: string | null, sinceToday: boolean): number {
+    const start = startOfUtcDayMs(now().getTime());
+    let n = 0;
+    for (const d of data.values()) {
+      for (const e of d.audit) {
+        if (e.type !== type) continue;
+        if (actorId !== null && e.actorId !== actorId) continue;
+        if (sinceToday && Date.parse(e.createdAt) < start) continue;
+        n += 1;
+      }
+    }
+    return n;
+  }
+
   const canRead = (d: ProjectData, a: Actor) =>
     d.project.isDemo || (a.userId !== null && d.project.ownerId === a.userId);
 
@@ -263,6 +289,12 @@ export function createFixtureStore(options: FixtureStoreOptions = {}): FixtureSt
     async createProject(actor, input) {
       if (actor.userId === null)
         throw new StoreError("unauthorized", 401, "Sign in to create a project.");
+      if (guards.maxProjectsPerGuest !== undefined && isAnonymous(actor.userId)) {
+        const owned = [...data.values()].filter(
+          (d) => !d.project.isDemo && d.project.ownerId === actor.userId,
+        ).length;
+        if (owned >= guards.maxProjectsPerGuest) throw guestProjectLimit(guards.maxProjectsPerGuest);
+      }
       const id = nextId("proj");
       if (input.copyFromDemo) {
         seed(cloneWithPrefix(golden, id), actor.userId, false, input.name);
@@ -311,6 +343,12 @@ export function createFixtureStore(options: FixtureStoreOptions = {}): FixtureSt
           maxVideoMs: limitConfig.maxVideoMs,
           maxVideoBytes: limitConfig.maxVideoBytes,
         });
+      }
+      const me = actor.userId as string; // writable() guarantees a signed-in owner
+      if (guards.maxUploadsPerGuest !== undefined && isAnonymous(me)) {
+        if (countEvents("asset_version_created", me, false) >= guards.maxUploadsPerGuest) {
+          throw guestUploadLimit(guards.maxUploadsPerGuest);
+        }
       }
       const version = d.assets.reduce((m, a) => Math.max(m, a.version), 0) + 1;
       const assetVersion: AssetVersion = {
@@ -470,6 +508,12 @@ export function createFixtureStore(options: FixtureStoreOptions = {}): FixtureSt
             resetsAt: new Date(nextUtcDayMs(now().getTime())).toISOString(),
           },
         );
+      }
+      if (
+        guards.globalDailyAnalysisLimit !== undefined &&
+        countEvents("analysis_requested", null, true) >= guards.globalDailyAnalysisLimit
+      ) {
+        throw globalAnalysisLimit(guards.globalDailyAnalysisLimit, nextUtcDayMs(now().getTime()));
       }
       const stamp = iso();
       const job: ProcessingJob = {

@@ -42,6 +42,10 @@ import {
   type PurgeResult,
   type ReportData,
   type RetentionStore,
+  type GuardOptions,
+  globalAnalysisLimit,
+  guestProjectLimit,
+  guestUploadLimit,
   retentionCutoff,
 } from "../store";
 import {
@@ -71,6 +75,8 @@ export interface SupabaseStoreOptions {
   dailyAnalysisLimit?: number;
   /** Longest video in ms. Default 180000. */
   maxVideoMs?: number;
+  /** Abuse guards (step 6). Unset means no limit. See `GuardOptions`. */
+  guards?: GuardOptions;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -338,6 +344,29 @@ export function createSupabaseStore(options: SupabaseStoreOptions): SupabaseStor
     }
   }
 
+  const guards = options.guards ?? {};
+
+  /** A user made by signInAnonymously(). Only these get the per-guest limits. */
+  async function isAnonymousUser(q: Q, userId: string): Promise<boolean> {
+    const rows = await q.execute(
+      sql`select 1 from auth.users where id = ${userId}::uuid and is_anonymous limit 1`,
+    );
+    return rows.length > 0;
+  }
+
+  /** Holds a per-key lock to the end of the transaction, so two tabs cannot both slip under a cap. */
+  const lockFor = (q: Q, key: string) => q.execute(sql`select pg_advisory_xact_lock(hashtext(${key}))`);
+
+  /** Accepted analysis requests by everyone today (UTC). */
+  async function allAnalysesToday(q: Q): Promise<number> {
+    const start = new Date(startOfUtcDayMs(now().getTime())).toISOString();
+    const [row] = await q
+      .select({ n: sql<number>`count(*)::int` })
+      .from(t.auditEvents)
+      .where(and(eq(t.auditEvents.type, "analysis_requested"), gte(t.auditEvents.createdAt, start)));
+    return row?.n ?? 0;
+  }
+
   /** Accepted analysis requests by this user today (UTC), across all their projects. */
   async function analysesToday(q: Q, userId: string): Promise<number> {
     const start = new Date(startOfUtcDayMs(now().getTime())).toISOString();
@@ -403,6 +432,15 @@ export function createSupabaseStore(options: SupabaseStoreOptions): SupabaseStor
       const me = uid(actor);
       if (me === null) throw new StoreError("unauthorized", 401, "Sign in to create a project.");
       return db.transaction(async (tx) => {
+        if (guards.maxProjectsPerGuest !== undefined && (await isAnonymousUser(tx, me))) {
+          await lockFor(tx, `projects:${me}`);
+          const [row] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(t.projects)
+            .where(and(eq(t.projects.ownerId, me), eq(t.projects.isDemo, false)));
+          const owned = row?.n ?? 0;
+          if (owned >= guards.maxProjectsPerGuest) throw guestProjectLimit(guards.maxProjectsPerGuest);
+        }
         const id = newId("prj");
         const stamp = iso();
         if (input.copyFromDemo) {
@@ -461,6 +499,17 @@ export function createSupabaseStore(options: SupabaseStoreOptions): SupabaseStor
             maxVideoMs: limitConfig.maxVideoMs,
             maxVideoBytes: limitConfig.maxVideoBytes,
           });
+        }
+        const me = uid(actor) as string; // writableProject guarantees a signed-in owner
+        if (guards.maxUploadsPerGuest !== undefined && (await isAnonymousUser(tx, me))) {
+          await lockFor(tx, `uploads:${me}`);
+          // Uploads in projects that still exist: a purged or deleted project frees its share.
+          const [row] = await tx
+            .select({ n: sql<number>`count(*)::int` })
+            .from(t.auditEvents)
+            .where(and(eq(t.auditEvents.type, "asset_version_created"), eq(t.auditEvents.actorId, me)));
+          const uploads = row?.n ?? 0;
+          if (uploads >= guards.maxUploadsPerGuest) throw guestUploadLimit(guards.maxUploadsPerGuest);
         }
         const [max] = await tx
           .select({ v: sql<number>`coalesce(max(${t.assetVersions.version}), 0)::int` })
@@ -670,6 +719,12 @@ export function createSupabaseStore(options: SupabaseStoreOptions): SupabaseStor
               resetsAt: new Date(nextUtcDayMs(now().getTime())).toISOString(),
             },
           );
+        }
+        if (guards.globalDailyAnalysisLimit !== undefined) {
+          await lockFor(tx, "analyses:all");
+          if ((await allAnalysesToday(tx)) >= guards.globalDailyAnalysisLimit) {
+            throw globalAnalysisLimit(guards.globalDailyAnalysisLimit, nextUtcDayMs(now().getTime()));
+          }
         }
         const stamp = iso();
         const [created] = await tx

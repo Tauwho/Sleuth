@@ -318,6 +318,28 @@ It prints only `ok` or `error <category>`. The category is read from the error's
 Vercel's [fair use guidelines](https://vercel.com/docs/limits/fair-use-guidelines#commercial-usage) limit Hobby teams to non-commercial personal use. Commercial use means a deployment used for the financial gain of anyone involved in any part of its production. The listed examples are payments from visitors, advertising a sale, paid hosting or coding work, affiliate links, and ads. Asking for donations is not commercial.
 
 SLEUTH has none of those. A hackathon prize is not on the list, but the definition is wide ("financial gain of anyone"), so whether a prize counts is not clear from the text. Vercel says to contact its support when unsure. Our reading: a hackathon demo fits Hobby. It is a reading, not Vercel's answer. If you want certainty, ask Vercel support before launch. If it does not fit, the fallback is another free static and server host, which would need its own check.
+## Abuse guards (step 6 of the product plan, 15 Nov 2026)
+
+These protect the free 1 GB of storage and the one-time transcription credit from a script that makes guest after guest.
+
+| Guard | Default in Supabase mode | Variable (Vercel, Production) | Where |
+|---|---|---|---|
+| Projects one anonymous guest may own | 2 | `MAX_PROJECTS_PER_GUEST` | `createProject`, 429 `project_limit` |
+| Videos one anonymous guest may upload (in projects that still exist) | 2 | `MAX_UPLOADS_PER_GUEST` | `createUploadUrl`, 429 `upload_limit` |
+| Analyses for everyone together per UTC day | 50 | `GLOBAL_DAILY_ANALYSIS_LIMIT` | `startAnalysis`, 429 `global_limit` |
+| Guest projects and their files removed after | 1 day (was 7) | `ANONYMOUS_RETENTION_DAYS` in `worker.yml` | worker purge (ADR 0008) |
+| A human check before each guest sign-in | off until both halves below are done | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | `lib/turnstile.ts`, Supabase Auth |
+
+Worst case for storage: 20 guests a day x 2 videos x 50 MB = 2 GB, so the 1-day purge and the human check together matter. Signed-up (team) accounts have no guest limits. Fixture mode has no guards unless the variables are set.
+
+**Turning on the human check** (Cloudflare Turnstile is free). Order matters. If Supabase asks for a token before the site sends one, every guest sign-in fails.
+1. Cloudflare dashboard, Turnstile, Add widget: name `sleuth`, hostnames `sleuth-eight.vercel.app` (and `localhost` for testing), widget mode Managed. Copy the **site key** (public) and the **secret key**.
+2. Vercel, project `sleuth`, Settings, Environment Variables: add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` = the site key, Production. Redeploy. Guest sign-in now sends a token, and Supabase ignores it until step 3.
+3. Supabase, `sleuth-prod`, Authentication, Attack Protection (Bot and Abuse Protection), Enable CAPTCHA protection: provider Cloudflare Turnstile, paste the **secret key**, Save.
+4. Check: signed out on the live site, press "Start a blank project". It should open a new project, with at most a small check in the corner.
+
+Undo: switch CAPTCHA protection off in Supabase first, then remove the Vercel variable.
+
 ## Rollback
 - Web: promote the previous deployment in Vercel.
 - Worker: disable the workflow in the Actions tab.

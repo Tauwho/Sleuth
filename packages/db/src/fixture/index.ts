@@ -13,6 +13,7 @@ export {
   type PurgeResult,
   type ReportData,
   type RetentionStore,
+  type GuardOptions,
   ANONYMOUS_RETENTION_DAYS,
   retentionCutoff,
 } from "../store";
