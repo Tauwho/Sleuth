@@ -65,6 +65,11 @@ test("the whole demo path runs with no API call and no other host, and survives 
   await page.goto(`${copyUrl}/report`);
   await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
 
+  // Reset forgets the copy and opens the dashboard.
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("a[href^='/projects/proj-']")).toHaveCount(0);
+
   expect(net.api).toEqual([]);
   expect(net.foreign).toEqual([]);
 });
@@ -83,4 +88,47 @@ test("a new tab starts from the scenario, not from another tab's changes", async
   await expect(second.getByRole("link", { name: /Open demo/ })).toBeVisible();
   await expect(second.locator("a[href^='/projects/proj-']")).toHaveCount(0);
   await context.close();
+});
+
+test("pre-flight passes on a clean tab and starts the recording view", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto("/demo/preflight");
+  const summary = page.getByTestId("preflight-summary");
+  await expect(summary).toHaveText("All checks passed. Ready to record.", { timeout: 30_000 });
+  for (const id of ["scenario", "api", "clean", "network", "video", "fonts", "viewport"]) {
+    await expect(page.locator(`[data-check='${id}']`)).toHaveAttribute("data-state", "ok");
+  }
+
+  await page.getByRole("button", { name: "Reset and start recording" }).click();
+  await expect(page).toHaveURL(/\/\?rec=1$/);
+  const banner = page.getByTestId("demo-banner");
+  await expect(banner).toHaveAttribute("data-rec", "1");
+  // Disclosure stays, the reset button goes, and nothing animates.
+  await expect(banner).toContainText("Demo mode: sample data");
+  await expect(page.getByRole("button", { name: "Reset demo" })).toHaveCount(0);
+  const duration = await page.evaluate(() => {
+    const el = document.createElement("div");
+    el.style.transition = "opacity 2s";
+    document.body.appendChild(el);
+    return getComputedStyle(el).transitionDuration;
+  });
+  expect(duration).toBe("0s");
+
+  // The choice stays for the tab until ?rec=0.
+  await page.goto("/projects/proofpay-demo");
+  await expect(page.getByTestId("demo-banner")).toHaveAttribute("data-rec", "1");
+  await page.goto("/?rec=0");
+  await expect(page.getByRole("button", { name: "Reset demo" })).toBeVisible();
+});
+
+test("pre-flight flags a tab with changes", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/projects/proofpay-demo");
+  await page.getByRole("button", { name: "Make an editable copy" }).first().click();
+  await expect(page).toHaveURL(/\/projects\/proj-\d+$/);
+  await page.goto("/demo/preflight");
+  await expect(page.locator("[data-check='clean']")).toHaveAttribute("data-state", "fail", {
+    timeout: 30_000,
+  });
 });
