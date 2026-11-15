@@ -5,6 +5,7 @@ import type { EvidenceCandidate, Finding, ProcessingJob } from "@sleuth/contract
 import { useDemoApi } from "@/components/guest-auth-provider";
 import { ProcessingState } from "@/components/state-panel";
 import { Button } from "@/components/ui/button";
+import { useDoneAlert, type DoneAlertPorts } from "./use-done-alert";
 import { useJobPoll } from "./use-job-poll";
 
 export interface AnalysisPanelProps {
@@ -16,6 +17,44 @@ export interface AnalysisPanelProps {
   /** Reload evidence and findings after a job succeeds. */
   onSucceeded: () => void | Promise<void>;
   intervalMs?: number;
+  /** Tests only: the tab title and notification ports. */
+  alertPorts?: DoneAlertPorts;
+}
+
+const STAGES = [
+  { id: "queued", label: "Queued" },
+  { id: "running", label: "Worker running" },
+  { id: "done", label: "Results saved" },
+] as const;
+
+function minutesSince(iso: string, now: number): string | null {
+  if (now <= 0) return null;
+  const min = Math.floor((now - Date.parse(iso)) / 60_000);
+  if (!Number.isFinite(min) || min < 1) return "less than a minute";
+  return min === 1 ? "1 minute" : `${min} minutes`;
+}
+
+/** Where the real job is: its status from the server, and how long it has waited. */
+function JobStages({ job, now }: { job: ProcessingJob; now: number }) {
+  const at = job.status === "queued" ? 0 : job.status === "running" ? 1 : 2;
+  const waited = job.status === "queued" ? minutesSince(job.createdAt, now) : null;
+  return (
+    <div className="mt-2 text-xs text-muted" data-testid="job-stages">
+      <ol className="flex flex-wrap gap-2" aria-label="Analysis progress">
+        {STAGES.map((s, i) => (
+          <li
+            key={s.id}
+            aria-current={i === at ? "step" : undefined}
+            className={`rounded-md border px-2 py-0.5 ${i === at ? "border-line-strong text-foreground" : "border-line"}`}
+          >
+            {i < at ? "Done: " : ""}
+            {s.label}
+          </li>
+        ))}
+      </ol>
+      {waited ? <p className="mt-1">Waiting for {waited}.</p> : null}
+    </div>
+  );
 }
 
 function messageOf(error: unknown): string {
@@ -56,10 +95,12 @@ export function AnalysisPanel({
   fetchJob,
   onSucceeded,
   intervalMs,
+  alertPorts,
 }: AnalysisPanelProps) {
   const demo = useDemoApi() !== null;
   const statusText = demo ? DEMO_STATUS_TEXT : STATUS_TEXT;
   const { job, checkError, watch } = useJobPoll({ fetchJob, onSucceeded, intervalMs });
+  const alert = useDoneAlert(job, alertPorts);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | undefined>(undefined);
   const active = job !== null && (job.status === "queued" || job.status === "running");
@@ -121,12 +162,23 @@ export function AnalysisPanel({
             <ProcessingState
               statusText={`${statusText[job.status as "queued" | "running"]} Attempt ${job.attempts} of ${job.maxAttempts}.`}
             />
+            <JobStages job={job} now={now} />
             {demo ? null : (
               <p className="mt-2 text-xs text-muted">
                 The real job state is checked every 2 seconds. You can leave this page and come back; the result
                 is kept. If no worker is running (fixture mode in the web app has none), the job stays queued.
               </p>
             )}
+            {!demo && alert.permission === "default" ? (
+              <Button className="mt-2" size="sm" variant="outline" onClick={() => void alert.ask()}>
+                Notify me when it is done
+              </Button>
+            ) : null}
+            {!demo && alert.permission === "granted" ? (
+              <p className="mt-2 text-xs text-muted" data-testid="notify-on">
+                This browser will show a notification when the analysis finishes.
+              </p>
+            ) : null}
           </div>
         ) : null}
         {job && job.status === "queued" && now > 0 && now - Date.parse(job.createdAt) > STALLED_AFTER_MS ? (
