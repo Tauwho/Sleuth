@@ -61,6 +61,13 @@ async function load() {
   const { client } = clientFor(routes);
   const view = render(<Workspace projectId="p1" client={client} />);
   await screen.findByRole("heading", { level: 1, name: "Test project" });
+  // The project, the evidence and the findings arrive in separate requests. Several tests switch
+  // to fake timers right after this, so wait until the evidence markers and the finding are on
+  // screen. Waiting for the heading alone let a busy machine (the full suite) start the clock
+  // before the evidence intervals existed, and "Playing now" was missing about 1 run in 3.
+  await screen.findByRole("button", { name: /^Evidence for line 1,/ });
+  await screen.findByRole("button", { name: /^Evidence for line 3,/ });
+  await waitFor(() => expect(screen.getByTestId("workspace-counts")).toHaveTextContent("(1 open)"));
   return view;
 }
 
