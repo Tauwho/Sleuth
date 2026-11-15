@@ -43,7 +43,7 @@ These screenshots are from the live site on 14 November (`scripts/prod-screensho
 
 **Not measured.** We chose not to run an accuracy evaluation before submission (decision D-21). We publish no precision, recall or accuracy number. The harness (`pnpm eval`, `docs/evaluation-protocol.md`) is in the repository for a later run.
 
-Uploading your own video gives a speech-only check. The worker runs on a free GitHub Actions schedule, so a job can wait 10 to 15 minutes (ADR 0009).
+Uploading your own video checks the speech (Deepgram) and the on-screen text (Tesseract OCR, read on the worker; ADR 0011). The web app starts the free GitHub Actions worker as soon as a job is queued, so a job usually starts within a minute. If that start fails, the 10-minute schedule picks it up (ADR 0009).
 
 ## How it fits together
 

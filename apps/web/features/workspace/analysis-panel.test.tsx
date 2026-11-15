@@ -7,7 +7,11 @@ import { evidence, finding } from "./test-fixtures";
 
 // Job states below are simulated for tests only. The fixture API keeps a job queued
 // because the web app runs no worker.
-function job(id: string, status: ProcessingJob["status"], over: Partial<ProcessingJob> = {}): ProcessingJob {
+function job(
+  id: string,
+  status: ProcessingJob["status"],
+  over: Partial<ProcessingJob> = {},
+): ProcessingJob {
   return {
     id,
     projectId: "p1",
@@ -44,7 +48,11 @@ function show(props: Partial<React.ComponentProps<typeof AnalysisPanel>> = {}) {
   const utils = render(
     <AnalysisPanel
       readOnly={false}
-      evidence={[evidence("e1", "candidate"), evidence("e2", "confirmed"), evidence("e3", "needs_outside_proof")]}
+      evidence={[
+        evidence("e1", "candidate"),
+        evidence("e2", "confirmed"),
+        evidence("e3", "needs_outside_proof"),
+      ]}
       findings={[finding("f1", "ghost"), finding("f2", "cursed_frame", "resolved")]}
       startAnalysis={vi.fn(async () => job("j1", "queued"))}
       fetchJob={vi.fn()}
@@ -64,14 +72,17 @@ describe("AnalysisPanel", () => {
   });
 
   it("follows queued, then running, then succeeded, polling every 2 seconds", async () => {
-    const answers = [job("j1", "running", { attempts: 1 }), job("j1", "succeeded", { attempts: 1 })];
+    const answers = [
+      job("j1", "running", { attempts: 1 }),
+      job("j1", "succeeded", { attempts: 1 }),
+    ];
     const fetchJob = vi.fn(async () => answers.shift() ?? job("j1", "succeeded"));
     const { onSucceeded } = show({ fetchJob });
 
     fireEvent.click(screen.getByRole("button", { name: "Run analysis" }));
     await flush();
     expect(screen.getByTestId("job-processing")).toHaveTextContent(
-      "Queued. Analysis starts within about 10 to 15 minutes. Attempt 0 of 3.",
+      "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy. Attempt 0 of 3.",
     );
     expect(fetchJob).not.toHaveBeenCalled();
 
@@ -80,7 +91,9 @@ describe("AnalysisPanel", () => {
     await advance(1);
     expect(fetchJob).toHaveBeenCalledTimes(1);
     expect(fetchJob).toHaveBeenCalledWith("j1");
-    expect(screen.getByTestId("job-processing")).toHaveTextContent("Analysis running. Attempt 1 of 3.");
+    expect(screen.getByTestId("job-processing")).toHaveTextContent(
+      "Analysis running. Attempt 1 of 3.",
+    );
 
     await advance(2000);
     expect(fetchJob).toHaveBeenCalledTimes(2);
@@ -121,7 +134,9 @@ describe("AnalysisPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await flush();
     expect(startAnalysis).toHaveBeenCalledTimes(2);
-    expect(screen.getByTestId("job-processing")).toHaveTextContent("Queued. Analysis starts within about 10 to 15 minutes.");
+    expect(screen.getByTestId("job-processing")).toHaveTextContent(
+      "Queued. Analysis usually starts within a minute, or up to 15 minutes when the worker is busy.",
+    );
     await advance(2000);
     expect(fetchJob).toHaveBeenLastCalledWith("j2");
     expect(screen.getByTestId("job-done")).toBeInTheDocument();
@@ -164,7 +179,9 @@ describe("AnalysisPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await flush();
     await advance(2000);
-    expect(screen.getByTestId("job-processing")).toHaveTextContent("Analysis running. Attempt 1 of 3.");
+    expect(screen.getByTestId("job-processing")).toHaveTextContent(
+      "Analysis running. Attempt 1 of 3.",
+    );
     expect(screen.queryByTestId("job-failed")).not.toBeInTheDocument();
   });
 
@@ -200,7 +217,9 @@ describe("AnalysisPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Run analysis" }));
     await flush();
     await advance(2000);
-    expect(screen.getByText("Could not check the job: Network down. Trying again in 2 seconds.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Could not check the job: Network down. Trying again in 2 seconds."),
+    ).toBeInTheDocument();
     await advance(2000);
     expect(screen.getByTestId("job-processing")).toHaveTextContent("Analysis running.");
     expect(screen.queryByText(/Could not check the job/)).not.toBeInTheDocument();
@@ -213,7 +232,9 @@ describe("AnalysisPanel", () => {
     show({ startAnalysis });
     fireEvent.click(screen.getByRole("button", { name: "Run analysis" }));
     await flush();
-    expect(screen.getByRole("alert")).toHaveTextContent("Add a video and a script before analysis.");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Add a video and a script before analysis.",
+    );
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -241,4 +262,5 @@ describe("AnalysisPanel", () => {
     await advance(2000);
     expect(screen.getByTestId("job-stalled")).toHaveTextContent("waited more than 30 minutes");
     expect(screen.getByTestId("job-processing")).toHaveTextContent("Queued.");
-  });});
+  });
+});
