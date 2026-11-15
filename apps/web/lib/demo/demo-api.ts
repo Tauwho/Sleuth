@@ -10,7 +10,20 @@ import { createFixtureStore, StoreError, type Actor, type FixtureStore } from "@
 import { runPipeline } from "@sleuth/evidence-engine";
 import type { TranscriptionProvider, VideoAnalysisProvider } from "@sleuth/media/core";
 import { buildCsv, buildHtml } from "../../app/api/_lib/report";
+import {
+  compileRoutes,
+  createEventLog,
+  createSerialQueue,
+  jsonResponse,
+  matchRoute,
+  readFetchCall,
+  timelineStage,
+  type DemoStorage,
+  type LogEntry,
+} from "@sleuth/demo-harness";
 import type { DemoScenario } from "./scenario";
+
+export type { DemoStorage } from "@sleuth/demo-harness";
 
 /**
  * Demo mode's API (ADR 0010). It answers every `/api/v1` call inside the browser, from the
@@ -29,28 +42,6 @@ const ACTOR: Actor = { userId: DEMO_USER };
 const API_PREFIX = "/api/v1";
 const FRAME_INTERVAL_MS = 2000;
 const MAX_FRAMES = 60;
-
-type LoggedEvent =
-  | { kind: "call"; at: number; method: string; path: string; body?: unknown }
-  | { kind: "finish"; at: number; projectId: string; jobId: string };
-
-const LoggedEventSchema: z.ZodType<LoggedEvent> = z.union([
-  z.object({
-    kind: z.literal("call"),
-    at: z.number(),
-    method: z.string(),
-    path: z.string(),
-    body: z.unknown().optional(),
-  }),
-  z.object({
-    kind: z.literal("finish"),
-    at: z.number(),
-    projectId: z.string(),
-    jobId: z.string(),
-  }),
-]) as z.ZodType<LoggedEvent>;
-
-export type DemoStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export interface DemoApiOptions {
   scenario: DemoScenario;
@@ -93,42 +84,8 @@ export interface DemoApi {
   keepUpload: (uploadUrl: string, file: Blob) => boolean;
 }
 
-interface Route {
-  spec: EndpointSpec;
-  pattern: RegExp;
-  names: string[];
-}
-
-const ROUTES: Route[] = (ENDPOINTS as readonly EndpointSpec[]).map((spec) => {
-  const names: string[] = [];
-  const source = spec.path
-    .split("/")
-    .map((part) => {
-      const m = /^\{(\w+)\}$/.exec(part);
-      if (!m) return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      names.push(m[1] as string);
-      return "([^/]+)";
-    })
-    .join("/");
-  return { spec, pattern: new RegExp(`^${source}$`), names };
-});
-
-function match(
-  method: string,
-  path: string,
-): { spec: EndpointSpec; params: Record<string, string> } | null {
-  for (const route of ROUTES) {
-    if (route.spec.method !== method) continue;
-    const m = route.pattern.exec(path);
-    if (!m) continue;
-    const params: Record<string, string> = {};
-    route.names.forEach((name, i) => {
-      params[name] = decodeURIComponent(m[i + 1] ?? "");
-    });
-    return { spec: route.spec, params };
-  }
-  return null;
-}
+const ROUTES = compileRoutes(ENDPOINTS as readonly EndpointSpec[]);
+const match = (method: string, path: string) => matchRoute(ROUTES, method, path);
 
 /** What each endpoint does. Mirrors the thin route handlers in `app/api/v1`. */
 type Handler = (
@@ -190,12 +147,7 @@ export const HANDLERS: Record<string, Handler> = {
   reportHtml: async (s, params) => buildHtml(await s.getReportData(ACTOR, p(params, "id"))),
 };
 
-function json(status: number, value: unknown): Response {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
+const json = jsonResponse;
 function errorJson(status: number, code: string, message: string, details?: unknown): Response {
   return json(status, { error: { code, message, ...(details === undefined ? {} : { details }) } });
 }
@@ -232,7 +184,8 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
   const { scenario } = options;
   const storage = options.storage ?? null;
   const clock = options.clock ?? (() => Date.now());
-  const key = `sleuth-demo:${scenario.id}:v1`;
+  // v2: the log format moved to @sleuth/demo-harness (N8). An older v1 log is simply not read.
+  const log = createEventLog(storage, `sleuth-demo:${scenario.id}:v2`);
   const providers = replayProviders(scenario);
   const origin =
     options.origin ?? (typeof window !== "undefined" ? window.location.origin : "http://localhost");
@@ -251,7 +204,7 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
 
   let current = 0;
   let store: FixtureStore;
-  let events: LoggedEvent[] = [];
+  let events: LogEntry[] = [];
   /** Queued jobs the timeline has not finished yet: job id to project id and start time. */
   let pending = new Map<string, { projectId: string; createdAtMs: number }>();
 
@@ -267,26 +220,7 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     forgetFiles();
   }
 
-  function save() {
-    if (!storage) return;
-    try {
-      storage.setItem(key, JSON.stringify(events));
-    } catch {
-      // Storage full or blocked: the demo keeps working in memory for this page.
-    }
-  }
-
-  function readLog(): LoggedEvent[] {
-    if (!storage) return [];
-    try {
-      const raw = storage.getItem(key);
-      if (!raw) return [];
-      const parsed = z.array(LoggedEventSchema).safeParse(JSON.parse(raw));
-      return parsed.success ? parsed.data : [];
-    } catch {
-      return [];
-    }
-  }
+  const save = () => log.save(events);
 
   async function finish(projectId: string, jobId: string) {
     pending.delete(jobId);
@@ -326,7 +260,12 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
     for (const j of due) {
       current = j.at;
       await finish(j.projectId, j.jobId);
-      events.push({ kind: "finish", at: j.at, projectId: j.projectId, jobId: j.jobId });
+      events.push({
+        kind: "event",
+        at: j.at,
+        name: "finish",
+        data: { projectId: j.projectId, jobId: j.jobId },
+      });
     }
     if (due.length > 0) save();
   }
@@ -334,7 +273,7 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
   function overlay(job: ProcessingJob, now: number): ProcessingJob {
     const started = pending.get(job.id);
     if (job.status !== "queued" || !started) return job;
-    if (now - started.createdAtMs < scenario.timeline.runningAfterMs) return job;
+    if (timelineStage(scenario.timeline, now - started.createdAtMs) === "queued") return job;
     const at = new Date(started.createdAtMs + scenario.timeline.runningAfterMs).toISOString();
     return {
       ...job,
@@ -387,12 +326,12 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
 
   async function replay() {
     fresh();
-    const log = readLog();
-    for (const e of log) {
+    const saved = log.read();
+    for (const e of saved) {
       current = e.at;
       try {
-        if (e.kind === "finish") {
-          await finish(e.projectId, e.jobId);
+        if (e.kind === "event") {
+          if (e.name === "finish") await finish(e.data.projectId ?? "", e.data.jobId ?? "");
         } else {
           const found = match(e.method, e.path);
           if (!found) continue;
@@ -405,16 +344,11 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
         break;
       }
     }
-    if (events.length !== log.length) save();
+    if (events.length !== saved.length) save();
   }
 
   // Calls run one at a time, in order, after the saved log has been replayed.
-  let queue: Promise<unknown> = replay();
-  function serial<T>(task: () => Promise<T>): Promise<T> {
-    const next = queue.then(task, task);
-    queue = next.catch(() => undefined);
-    return next;
-  }
+  const serial = createSerialQueue(replay());
 
   async function handle(method: string, path: string, rawBody: string | null): Promise<Response> {
     const found = match(method, path);
@@ -473,25 +407,16 @@ export function createDemoApi(options: DemoApiOptions): DemoApi {
   }
 
   const demoFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-      "http://demo.invalid",
-    );
-    if (!url.pathname.startsWith(`${API_PREFIX}/`)) {
-      return errorJson(404, "not_found", "Demo mode answers only /api/v1 calls.");
-    }
-    const method = (
-      init?.method ?? (input instanceof Request ? input.method : "GET")
-    ).toUpperCase();
-    const rawBody = typeof init?.body === "string" ? init.body : null;
-    return serial(() => handle(method, url.pathname.slice(API_PREFIX.length), rawBody));
+    const call = readFetchCall(input, init, API_PREFIX);
+    if (!call) return errorJson(404, "not_found", "Demo mode answers only /api/v1 calls.");
+    return serial(() => handle(call.method, call.path, call.body));
   }) as typeof fetch;
 
   return {
     fetch: demoFetch,
     reset: () =>
       serial(async () => {
-        storage?.removeItem(key);
+        log.clear();
         fresh();
       }),
     changeCount: () => serial(async () => events.length),

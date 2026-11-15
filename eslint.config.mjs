@@ -72,4 +72,6 @@ export default tseslint.config(
     rules: forbid("@sleuth/db", "@sleuth/db/*", ...APPS),
   },
   { files: ["apps/worker/**/*.ts"], rules: forbid("@sleuth/web", "@sleuth/web/*") },
+  // The demo harness is meant to be reused by other apps: it imports nothing from SLEUTH (N8).
+  { files: ["packages/demo-harness/**/*.ts"], rules: forbid("@sleuth/*") },
 );
