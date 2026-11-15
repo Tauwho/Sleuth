@@ -36,3 +36,22 @@ describe("safeCode", () => {
     expect(safeCode(null)).toBe("-");
   });
 });
+
+describe("x-sleuth-error on a 500", () => {
+  it("carries only the error name and its short code", async () => {
+    const { endpoint } = await import("./api");
+    const boom = Object.assign(new Error("password authentication failed for user secret"), {
+      name: "PostgresError",
+      code: "28P01",
+    });
+    const handler = endpoint("listProjects", async () => {
+      throw boom;
+    });
+    const res = await handler(new Request("http://x/api/v1/projects"), {
+      params: Promise.resolve({}),
+    });
+    expect(res.status).toBe(500);
+    expect(res.headers.get("x-sleuth-error")).toBe("PostgresError 28P01");
+    expect(await res.text()).not.toContain("password");
+  });
+});
