@@ -105,7 +105,9 @@ describe("final seal through the API", () => {
     const html = await (await reportHtml(call(user, "GET"), ctx({ id }))).text();
     expect(html).toContain("Sealed by the project owner");
     expect(html).not.toContain(`Sealed by ${user}`);
-    expect(html).toContain(`<details><summary><small>Audit id</small></summary><small>${user}</small></details>`);
+    expect(html).toContain(
+      `<details><summary><small>Audit id</small></summary><small>${user}</small></details>`,
+    );
     expect(html).not.toContain("Draft: not signed off");
     const csv = await (await reportCsv(call(user, "GET"), ctx({ id }))).text();
     expect(csv).toContain("Sealed by the project owner");

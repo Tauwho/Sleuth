@@ -135,7 +135,19 @@ describe("report exports name the signer in words (issue #96)", () => {
     return {
       ...data,
       project: { ...data.project, ownerId: UUID },
-      decisions: [{ ...(data.decisions[0] ?? { id: "d1", evidenceId: "e1", decision: "confirm", createdAt: "2026-11-08T09:00:00.000Z", note: null, projectId: "p" }), reviewerId: UUID } as ReportData["decisions"][number]],
+      decisions: [
+        {
+          ...(data.decisions[0] ?? {
+            id: "d1",
+            evidenceId: "e1",
+            decision: "confirm",
+            createdAt: "2026-11-08T09:00:00.000Z",
+            note: null,
+            projectId: "p",
+          }),
+          reviewerId: UUID,
+        } as ReportData["decisions"][number],
+      ],
       seal: {
         id: "s",
         projectId: "p",
@@ -165,10 +177,14 @@ describe("report exports name the signer in words (issue #96)", () => {
     expect(withId[0]).toBe(`Signer id (audit),${UUID}`);
     expect(withId.slice(1).every((l) => l.split(",")[3] === UUID)).toBe(true);
     expect(csv).toContain("about,decision,reviewer,reviewer_id,time");
-    expect(csv.find((l) => l.startsWith("Sign-off,"))).toBe("Sign-off,Sealed by the project owner at 2026-11-08T10:00:00.000Z");
+    expect(csv.find((l) => l.startsWith("Sign-off,"))).toBe(
+      "Sign-off,Sealed by the project owner at 2026-11-08T10:00:00.000Z",
+    );
 
     const html = buildHtml(data);
-    expect(html).toContain(`<details><summary><small>Audit id</small></summary><small>${UUID}</small></details>`);
+    expect(html).toContain(
+      `<details><summary><small>Audit id</small></summary><small>${UUID}</small></details>`,
+    );
     // Outside the closed Audit id, the printable page holds no id.
     expect(html.replace(/<details>[\s\S]*?<\/details>/, "")).not.toMatch(UUID_RE);
     // No e-mail address anywhere (the CSS has "@page", which is not one).
