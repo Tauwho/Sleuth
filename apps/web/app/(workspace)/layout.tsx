@@ -4,7 +4,9 @@ import { GuestAuthProvider } from "@/components/guest-auth-provider";
 import { SaveStatusProvider } from "@/components/shell/save-status";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { SiteHeader } from "@/components/shell/site-header";
+import { DemoBanner } from "@/features/demo/demo-banner";
 import { clientAuthConfigFromEnv } from "@/lib/auth-config";
+import { getScenario, SCENARIO_IDS } from "@/lib/demo/scenarios";
 
 /**
  * The haunted-house shell (brief 007).
@@ -17,6 +19,10 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
   // signs in the way the running server expects. Only public values reach the browser.
   await connection();
   const authConfig = clientAuthConfigFromEnv();
+  const demoScenario =
+    authConfig.mode === "demo"
+      ? (getScenario(authConfig.scenario) ?? getScenario(SCENARIO_IDS[0] as string))
+      : null;
   return (
     <GuestAuthProvider config={authConfig}>
       <SaveStatusProvider>
@@ -29,6 +35,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
         </a>
 
         <div className="flex min-h-screen flex-col">
+          {demoScenario ? <DemoBanner disclosure={demoScenario.disclosure} /> : null}
           <SiteHeader />
           {/* At least one screen tall, so the footer never jumps when the page's data arrives (layout shift). */}
           <main id="main-content" tabIndex={-1} className="min-h-svh flex-1 outline-none">

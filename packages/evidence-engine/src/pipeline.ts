@@ -11,7 +11,7 @@ import {
   type SampledFrame,
   type TranscriptionProvider,
   type VideoAnalysisProvider,
-} from "@sleuth/media";
+} from "@sleuth/media/core";
 import { analyse, type EngineOutput } from "./analyse";
 import { planFrames } from "./frames";
 
