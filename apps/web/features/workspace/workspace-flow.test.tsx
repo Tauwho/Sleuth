@@ -126,7 +126,9 @@ describe("Workspace flow: one clock for player, timeline, script and Lantern", (
   it("highlights the line whose evidence interval holds the time while playing, and none in a gap", async () => {
     await load();
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole("button", { name: "Play simulated clock" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Play simulated clock" }));
+    });
     expect(screen.queryByText("Playing now")).not.toBeInTheDocument(); // 0.0 s: before any interval
     act(() => {
       vi.advanceTimersByTime(1500);

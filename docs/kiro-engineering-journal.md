@@ -1574,3 +1574,12 @@ Not shown: that `analysis.spec.ts` can never flake again. It passed 5 of 5 under
 - #43: a `--once` run takes no new job after `WORKER_ONCE_BUDGET_MS` (default 720000 ms, 12 minutes). A job already started finishes. Reason: one worst-case job can need about 6 minutes of Deepgram calls and 16 of Gemini calls with retries, and the workflow stops at 20 minutes. The last 8 workflow runs took 41 to 90 s, so normal runs are far from either limit. One worst-case job can still pass 20 minutes; the budget only stops a late start. `worker.yml` header no longer says the schedule is off.
 - #52: protocol step 6 no longer asks for a real run per clip (it conflicted with #67: one run on all five clips). Step 4 names the four finding types correctly.
 - Gate: lint and typecheck clean; worker, evidence-engine, contract and evaluation tests 237 passed, 18 skipped (need a database); property tests 115 of 115; ghost scan clean.
+
+## 2026-11-15: player fixes from the UI review of #64 and #84 (Đạt)
+
+- Goal: integrate the reviewed player fixes and the flaky-test fix on a branch from `main` (`394c787`).
+- Kiro feature used: chat; steering (`frontend.md`, `ai-safety.md`, `team-workflow.md`).
+- What changed: `usePlaybackUrl` returns a URL only for the asset it was fetched for, so asset A's video no longer shows while asset B loads. `PlaybackVideo` remembers a finished seek, including to 0, so a signed-URL refresh no longer jumps back. `workspace-flow.test.tsx` awaits the Play click inside `act` before fake timers move; no assertion or timeout was loosened.
+- What we checked first: both new regression tests fail on `main`'s source (old URL returned; position 12 instead of 0) and pass with the fix.
+- Result: player tests 48 of 48; `workspace-flow.test.tsx` 20 of 20 repeated runs, 16 tests each; `pnpm test` 1172 passed, 80 skipped; Playwright 86 of 86 (1 worker, no retries, fixture); lint and typecheck clean.
+- Not done: real phone, Narrator, Windows High Contrast, listening to Night wind over a real video, measuring the axe contrast "incomplete" nodes. #64 and #84 stay open.

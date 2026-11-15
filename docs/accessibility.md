@@ -372,6 +372,39 @@ The mobile performance score moves several points between identical runs. Repeat
 - Unused and legacy JavaScript (about 106 KiB and 14 KiB): these are framework bundles, and removing them is not cheap.
 - Mobile largest contentful paint is about 3.4 s on the throttled preset. It is the first text block, which waits for the page's JavaScript and data.
 
+## UI review follow-up (2026-11-15, issues #64 and #84)
+
+Base: `origin/main` at `394c787`. All checks are automated, in fixture mode, in Chromium. Nobody listened with a screen reader, used a real phone, or turned on Windows High Contrast for this review.
+
+### Fixes
+
+- **Old video after an asset change** (`use-playback-url.ts`): the hook kept returning asset A's URL while asset B's URL was loading. It now returns a URL only for the asset it was fetched for.
+- **Seek to 0 undone by a URL refresh** (`playback-video.tsx`): a finished seek, including one to 0, is now remembered, so a signed-URL refresh no longer jumps back to the old time.
+- **Flaky highlight test** (`workspace-flow.test.tsx`): the Play click is now awaited inside `act` before fake timers move. No assertion or timeout was loosened.
+
+### Results
+
+| Check | Result |
+|---|---|
+| New regression tests on `main`'s source | 2 of 2 fail as expected (old URL returned; position 12 instead of 0) |
+| Same tests with the fix | pass; player tests 48 of 48 |
+| `workspace-flow.test.tsx`, 20 repeated runs | 20 of 20 runs passed, 16 tests each |
+| Unit tests (`pnpm test`) | 1172 passed, 80 skipped |
+| Playwright, full suite, 1 worker, no retries | 86 of 86 passed |
+| `pnpm lint`, `pnpm typecheck` | pass |
+
+Before the test fix, the reviewer's repeat of `workspace-flow.test.tsx` passed 19 of 20 runs. The failure was the highlight-while-playing test (1.5 s expected, 0 received), not the slider test named in #64.
+
+From the reviewer's report (not re-run here): a signed-out, read-only axe and layout audit of production (dashboard, demo workspace with the Lantern, report, unknown project; 375x900 and 1440x900) found 0 violations and no sideways scroll of the main page. Axe left `color-contrast` nodes it could not decide: dashboard 18/21, workspace 3/11, report 49/57, project not found 9/10 (375/1440). These were not measured, so they are not a contrast pass.
+
+### Still open
+
+- A real phone.
+- Narrator on the changed header, findings cabinet, player, report and error states.
+- Windows High Contrast on the changed screens. The forced-colors emulation test passes, but it is not the same check.
+- Listening to Night wind while a real video plays and pauses.
+- Measuring the contrast "incomplete" nodes above.
+
 ## Known gaps
 
 - All screen-reader results come from one person (Đạt) using Narrator in Microsoft Edge on Windows. NVDA, JAWS and other browsers were not used.
@@ -379,6 +412,7 @@ The mobile performance score moves several points between identical runs. Repeat
 - Step 17 was checked by ear for "both messages heard". Their order and any overlap between them were not reported.
 - The other contrast themes and mobile width in a contrast theme were not checked.
 - The 6 axe "incomplete" colour-contrast nodes on the report page were not measured one by one. They are the same kinds as the 8 that were measured and passed.
-- The real HTML video player is not wired yet, because the API has no playable video URL. Its keyboard and caption behaviour is not checked.
+- The real HTML video player is wired (PR #48) and two playback-URL fixes landed on 2026-11-15 (see "UI review follow-up"). Real signed-video playback has not been rehearsed in a browser. Its keyboard and caption behaviour with a real video is not checked.
+- The 2026-11-15 review was not checked on a real phone, with Narrator, or in Windows High Contrast. Those checks are still open for the changed screens.
 - Focus goes to the script line when a marker is chosen (task 8 acceptance), not to the Lantern heading as the design text says. This is not decided yet.
 - Requirement 8.5 (AA contrast everywhere, including over fog) is only partly checked. It was checked by axe, by the focus-ring test, and by pixel measurement of the axe "incomplete" items and of hover states, at one viewport size and one moment of the fog animation. It is not proven for every state.
