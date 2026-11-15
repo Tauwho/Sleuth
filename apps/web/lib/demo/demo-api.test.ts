@@ -171,6 +171,34 @@ describe("demo mode API", () => {
     expect((await csv.text()).length).toBeGreaterThan(0);
   });
 
+  it("plays the scenario's own video for the demo and its copies, never for an upload", async () => {
+    const s = setup();
+    const demo = await s.api.getProject("proofpay-demo");
+    const demoUrl = await s.api.getPlaybackUrl("proofpay-demo", demo.assetVersion!.id);
+    expect(demoUrl.url).toBe("http://localhost/scenarios/proofpay-v1/video.mp4");
+
+    const { project } = await s.api.createProject("Copy", true);
+    const copy = await s.api.getProject(project.id);
+    expect((await s.api.getPlaybackUrl(project.id, copy.assetVersion!.id)).url).toBe(demoUrl.url);
+
+    const up = await s.api.createUploadUrl(project.id, {
+      fileName: "mine.mp4",
+      mimeType: "video/mp4",
+      sizeBytes: 1000,
+      durationMs: 10_000,
+    });
+    expect((await s.api.getPlaybackUrl(project.id, up.assetVersion.id)).url).toBeNull();
+  });
+
+  it("the scenario video file exists and matches the fixture length", async () => {
+    const { existsSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const file = join(__dirname, "..", "..", "public", scenario.video!.path);
+    expect(existsSync(file)).toBe(true);
+    expect(statSync(file).size).toBeGreaterThan(10_000);
+    expect(statSync(file).size).toBeLessThan(5 * 1024 * 1024);
+  });
+
   it("refuses anything that is not the API", async () => {
     const s = setup();
     const res = await s.demo.fetch("/somewhere-else");
