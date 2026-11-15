@@ -26,7 +26,13 @@ export interface ReportModel {
   reshoots: { about: string; note: string; status: string }[];
   outsideProof: { line: string; hint: string; acknowledged: string }[];
   /** `reviewerId` is the raw id (its own CSV column); `reviewer` is the readable label. */
-  decisions: { about: string; decision: string; reviewer: string; reviewerId: string; at: string }[];
+  decisions: {
+    about: string;
+    decision: string;
+    reviewer: string;
+    reviewerId: string;
+    at: string;
+  }[];
   notes: string[];
 }
 

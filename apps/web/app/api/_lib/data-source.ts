@@ -31,6 +31,31 @@ function seconds(value: string | undefined): number | undefined {
   return n === undefined ? undefined : n * 1000;
 }
 
+/**
+ * The web app talks to Supabase through the **transaction** pooler (port 6543) by default (N5).
+ * On 15 Nov 2026 every database read returned 500 for over 3 minutes after each production
+ * redeploy: the old deployment's frozen instances still held session-pooler clients (15 in
+ * total on the Free plan), so the new instances could not connect. In transaction mode a client
+ * holds a server connection only while a transaction runs, which suits short serverless
+ * requests. Prepared statements are already off (`createDb`), and the store's advisory locks are
+ * transaction-scoped, so both work there.
+ *
+ * Only a Supabase pooler URL on port 5432 is rewritten. `SLEUTH_DB_POOL_MODE=session` keeps the
+ * URL as given, as a one-variable rollback. The worker is not affected.
+ */
+export function webDatabaseUrl(url: string, mode: string | undefined): string {
+  if (mode?.trim() === "session") return url;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (!parsed.hostname.endsWith(".pooler.supabase.com") || parsed.port !== "5432") return url;
+  parsed.port = "6543";
+  return parsed.toString();
+}
+
 export function dataMode(): DataMode {
   const mode = process.env.SLEUTH_DATA_MODE;
   if (mode === "supabase" || mode === "demo") return mode;
@@ -48,7 +73,8 @@ const limits = () => ({
  * for everyone together. In fixture mode they apply only when set, so local tests are unchanged.
  */
 export function guardsFromEnv(env: NodeJS.ProcessEnv, supabase: boolean): GuardOptions {
-  const pick = (name: string, fallback: number) => positiveInt(env[name]) ?? (supabase ? fallback : undefined);
+  const pick = (name: string, fallback: number) =>
+    positiveInt(env[name]) ?? (supabase ? fallback : undefined);
   return {
     maxProjectsPerGuest: pick("MAX_PROJECTS_PER_GUEST", 2),
     maxUploadsPerGuest: pick("MAX_UPLOADS_PER_GUEST", 2),
@@ -80,7 +106,10 @@ export function getStore(): ProjectStore {
         // Each Vercel instance holds at most 2 connections and frees them after 10 idle seconds.
         // With the default (5, never idle out), three warm instances filled the session pooler's
         // 15 slots on 14 Nov 2026 and every write returned 500 (EMAXCONNSESSION).
-        db: createDb(url, { max: 2, idleTimeoutSeconds: 10 }).db,
+        db: createDb(webDatabaseUrl(url, process.env.SLEUTH_DB_POOL_MODE), {
+          max: 2,
+          idleTimeoutSeconds: 10,
+        }).db,
         storage: storageFromEnv() ?? undefined,
         ...limits(),
         guards: guardsFromEnv(process.env, true),

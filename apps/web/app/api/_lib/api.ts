@@ -52,12 +52,20 @@ export function errorResponse(
   return Response.json(errorBody(code, message, details), { status });
 }
 
+/** A short machine code from an error, or "-". Never a message: only [A-Z0-9_] up to 40 characters. */
+export function safeCode(err: unknown): string {
+  const code =
+    typeof err === "object" && err !== null ? (err as { code?: unknown }).code : undefined;
+  return typeof code === "string" && /^[A-Z0-9_]{2,40}$/.test(code) ? code : "-";
+}
+
 function toErrorResponse(err: unknown): Response {
   if (err instanceof ApiError || err instanceof StoreError) {
     return errorResponse(err.status, err.code, err.message, err.details);
   }
-  // Never echo internals. Log the error name only, never request content.
-  console.error("api_error", err instanceof Error ? err.name : "unknown");
+  // Never echo internals. Log the error name and its short code only (for example a Postgres
+  // SQLSTATE or EMAXCONNSESSION), never the message or request content.
+  console.error("api_error", err instanceof Error ? err.name : "unknown", safeCode(err));
   return errorResponse(500, "internal_error", "Something went wrong on our side.");
 }
 
