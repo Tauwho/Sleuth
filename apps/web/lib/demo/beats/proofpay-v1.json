@@ -1,0 +1,43 @@
+[
+  { "do": "open", "path": "/?rec=1", "say": "Demo videos drift from what they claim." },
+  { "do": "expect", "heading": "The cut is haunted." },
+  { "do": "expect", "testId": "demo-banner", "text": "Demo mode: sample data" },
+  {
+    "do": "click",
+    "role": "link",
+    "name": "Open demo: ProofPay demo (public example)",
+    "say": "This is the public demo, with sample results."
+  },
+  {
+    "do": "expect",
+    "testId": "workspace-counts",
+    "text": "4 evidence candidates, 4 findings (4 open)"
+  },
+  { "do": "click", "role": "button", "name": "Make an editable copy" },
+  { "do": "expect", "url": "/projects/proj-" },
+  {
+    "do": "click",
+    "role": "tab",
+    "name": "Analysis",
+    "say": "Every match is a candidate, never a verdict."
+  },
+  { "do": "click", "role": "button", "name": "Run analysis" },
+  { "do": "expect", "testId": "job-processing", "text": "Demo mode replays a saved run" },
+  { "do": "expect", "testId": "job-done", "text": "Analysis done.", "maxMs": 15000 },
+  { "do": "click", "role": "tab", "name": "Script", "say": "Change one line, re-check one line." },
+  {
+    "do": "edit",
+    "label": "Script text. Each sentence becomes one numbered line.",
+    "find": "the invoicing tool",
+    "replace": "the billing tool"
+  },
+  { "do": "click", "role": "button", "name": "Save script" },
+  { "do": "expect", "testId": "stale-summary" },
+  {
+    "do": "click",
+    "role": "link",
+    "name": "Open the Final Seal report",
+    "say": "The seal names who signed."
+  },
+  { "do": "expect", "heading": "Export" }
+]
