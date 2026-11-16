@@ -26,6 +26,9 @@ export function PlaybackVideo({
       onTimeUpdate={(e) => {
         if (e.currentTarget.currentTime > 0) lastSeconds.current = e.currentTarget.currentTime;
       }}
+      onSeeked={(e) => {
+        lastSeconds.current = e.currentTarget.currentTime;
+      }}
       onLoadedMetadata={(e) => {
         if (lastSeconds.current > 0 && e.currentTarget.currentTime === 0) {
           e.currentTarget.currentTime = lastSeconds.current;

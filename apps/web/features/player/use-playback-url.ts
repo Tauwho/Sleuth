@@ -21,7 +21,7 @@ export function usePlaybackUrl(
   fetchPlaybackUrl: (assetVersionId: string) => Promise<PlaybackAnswer>,
   assetVersionId: string | undefined,
 ): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+  const [answerForAsset, setAnswerForAsset] = useState<{ assetVersionId: string; url: string | null } | null>(null);
   const latest = useRef(fetchPlaybackUrl);
   useEffect(() => {
     latest.current = fetchPlaybackUrl;
@@ -37,7 +37,7 @@ export function usePlaybackUrl(
         .current(assetVersionId)
         .then((answer) => {
           if (cancelled) return;
-          setUrl(answer.url);
+          setAnswerForAsset({ assetVersionId, url: answer.url });
           if (answer.url && answer.expiresAt) {
             const wait = Math.max(MIN_REFRESH_MS, Date.parse(answer.expiresAt) - Date.now() - REFRESH_MARGIN_MS);
             timer = setTimeout(ask, wait);
@@ -45,7 +45,7 @@ export function usePlaybackUrl(
         })
         .catch(() => {
           // A failed check means "no playable video": the simulated clock stays available.
-          if (!cancelled) setUrl(null);
+          if (!cancelled) setAnswerForAsset({ assetVersionId, url: null });
         });
     };
     ask();
@@ -56,5 +56,5 @@ export function usePlaybackUrl(
     };
   }, [assetVersionId]);
 
-  return assetVersionId ? url : null;
+  return assetVersionId && answerForAsset?.assetVersionId === assetVersionId ? answerForAsset.url : null;
 }

@@ -372,13 +372,77 @@ The mobile performance score moves several points between identical runs. Repeat
 - Unused and legacy JavaScript (about 106 KiB and 14 KiB): these are framework bundles, and removing them is not cheap.
 - Mobile largest contentful paint is about 3.4 s on the throttled preset. It is the first text block, which waits for the page's JavaScript and data.
 
+## UI review follow-up (2026-11-15, issues #64 and #84)
+
+**Closure decision (2026-11-15):** Đạt reported Đăng's acceptance of the remaining verification limits and explicitly requested closure. Issues [#64](https://github.com/Tauwho/Sleuth/issues/64) and [#84](https://github.com/Tauwho/Sleuth/issues/84) are now closed. The unchecked cases below remain documented limitations, not newly claimed passes. No further review work is scheduled by this closure; local fixes/documentation are not represented as merged.
+
+Base for the local fixes: `origin/main` at `394c787`. Local regression checks use fixture mode; the separate production audit below is signed out and read-only. Automated browser checks use Chromium. A later Windows UI pass used Chrome, real Night sky and Narrator's Speech recap (see below); nobody listened by ear in that pass. Đạt separately reported a physical Android/Chrome check below.
+
+### Fixes
+
+- **Old video after an asset change** (`use-playback-url.ts`): the hook kept returning asset A's URL while asset B's URL was loading. It now returns a URL only for the asset it was fetched for.
+- **Seek to 0 undone by a URL refresh** (`playback-video.tsx`): a finished seek, including one to 0, is now remembered, so a signed-URL refresh no longer jumps back to the old time.
+- **Flaky highlight test** (`workspace-flow.test.tsx`): the Play click is now awaited inside `act` before fake timers move. No assertion or timeout was loosened.
+
+### Results
+
+| Check | Result |
+|---|---|
+| New regression tests on `main`'s source | 2 of 2 fail as expected (old URL returned; position 12 instead of 0) |
+| Same tests with the fix | pass; player tests 48 of 48 |
+| `workspace-flow.test.tsx`, 20 repeated runs | 20 of 20 runs passed, 16 tests each |
+| Unit tests (`pnpm test`) | 1172 passed, 80 skipped |
+| Playwright, full suite, 1 worker, no retries | 86 of 86 passed |
+| `pnpm lint`, `pnpm typecheck` | pass |
+
+Before the test fix, the reviewer's repeat of `workspace-flow.test.tsx` passed 19 of 20 runs. The failure was the highlight-while-playing test (1.5 s expected, 0 received), not the slider test named in #64.
+
+From the reviewer's report (not re-run here): a signed-out, read-only axe and layout audit of production (dashboard, demo workspace with the Lantern, report, unknown project; 375x900 and 1440x900) found 0 violations and no sideways scroll of the main page. Axe left `color-contrast` nodes it could not decide: dashboard 18/21, workspace 3/11, report 49/57, project not found 9/10 (375/1440). These were not measured, so they are not a contrast pass.
+
+### Independent verification of the committed fixes (2026-11-15)
+
+Codex checked commit `af33462`: all five source/test files match the reviewed copies byte for byte. An independent `pnpm test` run in that worktree passed 1172 tests, with 80 skipped.
+
+Three additional Chromium checks passed with one worker and no retries:
+
+- A native HTML video retains an intentional seek to 0 after its playback URL changes.
+- The video still restores a nonzero position (12 seconds) after that change.
+- Night wind starts off, produces a real Web Audio signal after a click, falls to silence while the video plays, returns after pause, and becomes silent when switched off. A follow-up signal measurement after the restore fade also passed.
+
+These browser checks used the existing local fixture production build from the reviewed source, an intercepted playback-URL response, and a generated 30-second silent MP4 served with byte-range support. They do not verify Supabase Storage or production signed URLs. Night wind was measured through a pass-through analyser in a real AudioContext, not listened to by a person. The final measured RMS was about 0.0167 before video playback, 0 during playback, and 0.0154 after pausing. Scripts and logs are outside the repository in `outputs/ui-review-followup-2026-11-15` in the parent workspace.
+
+### Windows UI follow-up (2026-11-15)
+
+On the public production site in desktop Chrome, an agent applied **Night sky in Windows Settings**, inspected the pages and restored **None** afterwards. No additional defect was found in the inspected dashboard/header, findings cabinet, workspace claims/selected line 3/Lantern, simulated-clock slider, timeline shapes/playhead/ranges, draft report/coverage/export or global 404. Switching Cursed Frame to Poltergeist with Right updated the detail panel and kept a visible focus outline. This is a bounded visual result for the real Windows theme, not a measured contrast ratio or a check of every state. Other themes, sealed/broken reports, editable controls and native-video controls were not checked in this Windows pass.
+
+Narrator's **actual Speech recap text** was visually readable this time, despite its limited accessibility tree. It included the navigation names, Night wind off and the signed-out guest status; the 404 heading and explanation; and Cursed Frame / Needs human check / Blocks the seal / selected 3 of 5, followed by Poltergeist / Evidence out of date / Blocks the seal / selected 4 of 5 after Right, with their explanations. The 404's back link returned to the dashboard. This verifies those speech-text cases only. Heading navigation could not be verified reliably because Scan mode/focus changed during tool-driven window activation. The Lantern body, real player and report announcements were not fully checked, and nobody listened for cut-off or overlap. Narrator was turned off after the check.
+
+### Production contrast follow-up (2026-11-15)
+
+The dashboard, demo workspace with line 3 selected, draft report and missing-project page were measured at **375x900 and 1440x900**. Animations were paused at their current initial phase and, in a second run, advanced to 35 seconds and paused. For the axe `color-contrast` incomplete targets, the tool collected computed foreground colours and text rectangles, temporarily made text fill transparent without changing layout, then sampled the rendered background pixels in those rectangles. It included form values and the report table's horizontally scrolled columns. This is a background-pixel contrast check, not human visual approval or an all-states WCAG certification.
+
+Each run contained 178 incomplete page/width target instances. **174 content targets were measured with no below-threshold result**; the other four instances were `.outline-word`, decorative, `aria-hidden` outlined words with transparent fill. There were 271 measured text/form rectangles per run. All measured ratios exceeded 4.5:1 (and therefore the 3:1 large-text threshold too); the lowest was about **5.17:1**. Remaining scope limits: hover/focus states, editable/sealed/broken reports and every other animation phase. Per-target results and method are in `outputs/ui-review-followup-2026-11-15/contrast-pixels*.json` and `CONTRAST-REVIEW.md` in the parent workspace.
+
+### Physical phone check (2026-11-15, reported by Đạt)
+
+Đạt checked the public site on a physical **Android phone using Chrome** and reported that all four requested steps were fine: dashboard text/buttons; opening the public demo and line 3's Lantern; report Coverage and Final Seal, with table scrolling contained inside its region; and rotating landscape/portrait while retaining readable content and usable buttons. The phone model, Android/Chrome versions and viewport were not supplied. This records the user's reported result, not an agent-controlled device test. It does not cover a real-video upload/playback, sign-in, editing, signing, TalkBack or mobile contrast themes.
+
+### Still open
+
+- Phone checks beyond the four Android/Chrome steps above, including real-video controls and assistive technology.
+- Complete the remaining Narrator paths, including Lantern body, real player, report announcements and heading navigation. The representative header/cabinet/404 speech-text checks above are not a complete listening pass.
+- Windows High Contrast beyond the inspected Night sky read-only states: other themes, editable/sealed/broken states and native-video controls.
+- Listening to Night wind while a real video plays and pauses.
+- Contrast states outside the bounded pixel measurements above, including hover/focus and editable/sealed/broken reports.
+
 ## Known gaps
 
-- All screen-reader results come from one person (Đạt) using Narrator in Microsoft Edge on Windows. NVDA, JAWS and other browsers were not used.
+- Human listening results come from one person (Đạt), using Narrator in Microsoft Edge on Windows. Agent-run Speech recap text checks also exist, including Chrome on 2026-11-15; they do not add another human listener. NVDA and JAWS were not used.
 - Step 15 was checked by ear for "read in full once, not repeated". Overlap with other speech was not reported.
 - Step 17 was checked by ear for "both messages heard". Their order and any overlap between them were not reported.
 - The other contrast themes and mobile width in a contrast theme were not checked.
-- The 6 axe "incomplete" colour-contrast nodes on the report page were not measured one by one. They are the same kinds as the 8 that were measured and passed.
-- The real HTML video player is not wired yet, because the API has no playable video URL. Its keyboard and caption behaviour is not checked.
+- The historical six report contrast incompletes were not measured individually at that time. The current production theme's incomplete content targets were measured in the 2026-11-15 follow-up above; that does not retrospectively test the old theme or cover every current state.
+- The real HTML video player is wired (PR #48); two playback-URL fixes are committed on `fix/web-player-asset-switch` as `af33462` (see "UI review follow-up"). Native browser playback and URL rotation passed with a local test clip and intercepted URL responses. Actual Supabase signed-video playback, and keyboard and caption behaviour with a real video, remain unchecked.
+- The 2026-11-15 physical-phone result is limited to Đạt's four reported Android/Chrome steps. Narrator speech-text and real Windows Night sky results likewise cover only the representative states listed above; the remaining paths stay open.
 - Focus goes to the script line when a marker is chosen (task 8 acceptance), not to the Lantern heading as the design text says. This is not decided yet.
-- Requirement 8.5 (AA contrast everywhere, including over fog) is only partly checked. It was checked by axe, by the focus-ring test, and by pixel measurement of the axe "incomplete" items and of hover states, at one viewport size and one moment of the fog animation. It is not proven for every state.
+- Requirement 8.5 (AA contrast everywhere, including over fog) is only partly checked. Axe, focus-ring tests and earlier hover measurements exist; the current theme's incomplete content targets additionally passed background-pixel measurement at two widths and two animation snapshots on 2026-11-15. Every state and animation moment is not proven.
