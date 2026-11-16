@@ -1,0 +1,86 @@
+{
+  "transcript": [
+    {
+      "startMs": 1000,
+      "endMs": 5000,
+      "text": "Welcome to ProofPay, the invoicing tool for freelancers."
+    },
+    {
+      "startMs": 6000,
+      "endMs": 10000,
+      "text": "First, click New Invoice to start a draft."
+    },
+    {
+      "startMs": 11000,
+      "endMs": 18000,
+      "text": "Now I enter the client name and an amount of 1,250 dollars."
+    },
+    {
+      "startMs": 19000,
+      "endMs": 24000,
+      "text": "Then I save it and check the preview."
+    },
+    {
+      "startMs": 30000,
+      "endMs": 35000,
+      "text": "ProofPay keeps all your customer data encrypted end to end."
+    },
+    {
+      "startMs": 44000,
+      "endMs": 47000,
+      "text": "Thanks for watching."
+    }
+  ],
+  "observations": [
+    {
+      "timestampMs": 2000,
+      "description": "Home screen of the app with a logo",
+      "onScreenText": ["ProofPay"]
+    },
+    {
+      "timestampMs": 4000,
+      "description": "Empty invoice list with a button in the top right",
+      "onScreenText": ["Invoices", "New Invoice"]
+    },
+    {
+      "timestampMs": 8000,
+      "description": "New invoice form opens with empty fields",
+      "onScreenText": ["New Invoice", "Client", "Amount"]
+    },
+    {
+      "timestampMs": 12000,
+      "description": "Form with the client field being typed in",
+      "onScreenText": ["Client", "Lumen Studio"]
+    },
+    {
+      "timestampMs": 14000,
+      "description": "Amount field filled in",
+      "onScreenText": ["Amount", "1,250.00"]
+    },
+    {
+      "timestampMs": 16000,
+      "description": "Completed invoice form",
+      "onScreenText": ["Client: Lumen Studio", "Amount: 1,250.00"]
+    },
+    {
+      "timestampMs": 20000,
+      "description": "Saved invoice preview",
+      "onScreenText": ["Preview", "Invoice INV-001"]
+    },
+    {
+      "timestampMs": 22000,
+      "description": "Preview page scrolled down",
+      "onScreenText": ["Preview"]
+    },
+    {
+      "timestampMs": 32000,
+      "description": "Settings page with a security section",
+      "onScreenText": ["Settings", "Security"]
+    },
+    {
+      "timestampMs": 46000,
+      "description": "Invoice list with one invoice",
+      "onScreenText": ["Invoices", "INV-001"]
+    }
+  ]
+}
