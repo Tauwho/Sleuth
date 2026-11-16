@@ -63,11 +63,11 @@ async function main(): Promise<number> {
       select
         count(*) filter (where u.is_anonymous)::int as guest,
         count(*) filter (where not coalesce(u.is_anonymous, false))::int as team
-      from projects p left join auth.users u on u.id::text = p.owner_id
+      from projects p left join auth.users u on u.id = p.owner_id
       where not p.is_demo`;
     const [analyses] = await sql`
       select count(*)::int as n from audit_events
-      where type = 'analysis_requested' and created_at >= (now() - interval '7 days')::text`;
+      where type = 'analysis_requested' and created_at >= now() - interval '7 days'`;
     const { lines, over } = report({
       storageBytes: Number(storage?.bytes ?? 0),
       storageFiles: Number(storage?.files ?? 0),
@@ -79,7 +79,10 @@ async function main(): Promise<number> {
     for (const line of lines) console.log(line);
     return over ? 1 : 0;
   } catch (error) {
-    console.log(`error ${categoryOf(error)}`);
+    // Category plus the SQLSTATE or driver code only (never the message), so a failure says why.
+    const code = (error as { code?: unknown } | null)?.code;
+    const safe = typeof code === "string" && /^[A-Z0-9_]{2,40}$/.test(code) ? code : "-";
+    console.log(`error ${categoryOf(error)} ${safe}`);
     return 1;
   } finally {
     await sql.end({ timeout: 2 }).catch(() => undefined);
