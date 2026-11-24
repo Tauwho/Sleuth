@@ -8,7 +8,7 @@ SLEUTH: a QA workspace that checks a software demo video against its script and 
 
 Category: Costume Contest. Bonus prizes we aim for: Best Student Project (only after the student check in `docs/coordination/human-actions.md` is done), Bonus Blog, Social Blitz, Best Demo.
 
-Links: live app https://sleuth-eight.vercel.app, repository https://github.com/dngvmnh/sleuth (MIT), video `[YouTube URL]`, blog `[URL]`, social post `[URL]`.
+Links: live app https://sleuth-eight.vercel.app, repository https://github.com/dngvmnh/sleuth (MIT), video https://youtu.be/0wrbDy8Lc58, blog `[URL]`, social post `[URL]`.
 
 ## Inspiration
 
