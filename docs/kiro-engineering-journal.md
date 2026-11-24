@@ -1574,3 +1574,37 @@ Not shown: that `analysis.spec.ts` can never flake again. It passed 5 of 5 under
 - #43: a `--once` run takes no new job after `WORKER_ONCE_BUDGET_MS` (default 720000 ms, 12 minutes). A job already started finishes. Reason: one worst-case job can need about 6 minutes of Deepgram calls and 16 of Gemini calls with retries, and the workflow stops at 20 minutes. The last 8 workflow runs took 41 to 90 s, so normal runs are far from either limit. One worst-case job can still pass 20 minutes; the budget only stops a late start. `worker.yml` header no longer says the schedule is off.
 - #52: protocol step 6 no longer asks for a real run per clip (it conflicted with #67: one run on all five clips). Step 4 names the four finding types correctly.
 - Gate: lint and typecheck clean; worker, evidence-engine, contract and evaluation tests 237 passed, 18 skipped (need a database); property tests 115 of 115; ghost scan clean.
+
+## 2026-11-15: player fixes from the UI review of #64 and #84 (Đạt)
+
+- Goal: integrate the reviewed player fixes and the flaky-test fix on a branch from `main` (`394c787`).
+- Kiro feature used: chat; steering (`frontend.md`, `ai-safety.md`, `team-workflow.md`).
+- What changed: `usePlaybackUrl` returns a URL only for the asset it was fetched for, so asset A's video no longer shows while asset B loads. `PlaybackVideo` remembers a finished seek, including to 0, so a signed-URL refresh no longer jumps back. `workspace-flow.test.tsx` awaits the Play click inside `act` before fake timers move; no assertion or timeout was loosened.
+- What we checked first: both new regression tests fail on `main`'s source (old URL returned; position 12 instead of 0) and pass with the fix.
+- Result: player tests 48 of 48; `workspace-flow.test.tsx` 20 of 20 repeated runs, 16 tests each; `pnpm test` 1172 passed, 80 skipped; Playwright 86 of 86 (1 worker, no retries, fixture); lint and typecheck clean.
+- Not done: real phone, Narrator, Windows High Contrast, listening to Night wind over a real video, measuring the axe contrast "incomplete" nodes. #64 and #84 stay open.
+
+## 2026-11-15: independent verification of `af33462` (Codex, requested by Đạt)
+
+- Compared all five committed source/test files with the reviewed copies: byte-for-byte matches. No additional application code change was needed.
+- Independently ran `pnpm test` in `sleuth-player-fix`: 1172 passed, 80 skipped.
+- Additional Chromium checks: 3 of 3 passed (one worker, no retries). Native video kept a seek to 0 and restored 12 seconds across a playback-URL change. Real Web Audio signal measurement verified Night wind off initially, on after a click, silent during video playback, restored after pause, and off again; a follow-up check after the restore fade passed too.
+- Scope: the matching reviewed local fixture production build, intercepted playback-URL responses and a generated silent MP4 with byte-range support. No live Supabase signed URL was tested and no person listened. The first media harness did not serve byte ranges, preventing seeking; correcting that harness required no application changes.
+- Updated `docs/accessibility.md` to distinguish these checks from the remaining manual and storage checks. External evidence: `outputs/ui-review-followup-2026-11-15` in the parent workspace. No staging, commit, push or GitHub comment by Codex; no Kiro feature is claimed for this verification. #64 and #84 remain open.
+
+## 2026-11-15: real Windows theme and partial Narrator follow-up (Codex, requested by Đạt)
+
+- On the signed-out public production demo in desktop Chrome, applied Night sky through Windows Settings. No additional defect found in the inspected dashboard/header/cabinet, workspace claims/selected line/Lantern, simulated-clock slider, timeline marker shapes/playhead/ranges, draft report and global 404. Right changed cabinet selection from Cursed Frame to Poltergeist with a visible focus outline. Restored Contrast themes to None afterwards. Other themes, editable/sealed/broken states and native-video controls are not covered.
+- Opened Narrator Speech recap with Insert+Alt+X and read the actual rendered text: navigation/guest state, 404 copy, and cabinet labels, selected positions and explanations for Cursed Frame and Poltergeist. Nobody listened by ear. H navigation was not reliably verified during tool-driven focus/Scan mode changes; Lantern body, real player and report announcements remain incomplete. Exited Narrator after checking.
+- No sign-in, editable copy, upload, review decision, seal, production-data write, commit, push or issue closure. External detailed observations: `outputs/ui-review-followup-2026-11-15/WINDOWS-REVIEW.md` in the parent workspace. Physical-phone verification has been requested from Đạt; no result recorded yet.
+
+## 2026-11-15: bounded contrast measurement and Android check (Codex / Đạt)
+
+- Codex measured production axe contrast incompletes on dashboard, demo workspace/Lantern, draft report and missing-project page at 375x900 and 1440x900, at a paused initial animation phase and at 35 seconds. Each run had 178 incomplete target instances: 174 content targets measured, no below-threshold result; four decorative `.outline-word` instances excluded. 271 text/form rectangles per run; lowest ratio about 5.17:1. Method: computed foreground colours against screenshot background pixels with text fill temporarily hidden; report's hidden columns were scrolled into view. These results do not establish every hover/focus, editable/sealed/broken or animation state. Scripts/results remain outside the repo.
+- Đạt reported all four physical-phone steps fine on Android/Chrome: dashboard, opening public demo and line 3 Lantern, report/contained table scrolling, and portrait/landscape rotation. Model/version/viewport not supplied. This is a user-reported check, not an agent-controlled phone test, and covers no upload, sign-in, editing, signing, real-video or TalkBack flow.
+- Updated accessibility scope and remaining gaps. No further source change, stage, commit, push or issue closure by Codex. Remaining manual listening and complete screen-reader/real-video paths stay explicit.
+
+## 2026-11-15: UI review closed at Đạt's request
+
+- Đạt reported that Đăng accepted the remaining limits, then explicitly requested closing the review and ending the work. Closed #64 and #84 as completed, with a comment on each distinguishing the accepted handoff scope from unverified cases. Verified both closed through GitHub after the update.
+- Repository now resolves to `Tauwho/Sleuth`. The connected GitHub integration lacked write access; the existing Git login `phatdat220707` completed the requested updates. No source change, stage, commit, push or merge. Earlier entries saying the issues remain open describe the state before this closure decision. No further review work is scheduled.

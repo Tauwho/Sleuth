@@ -28,6 +28,22 @@ describe("usePlaybackUrl", () => {
     expect(fetchUrl).toHaveBeenCalledTimes(1);
   });
 
+  it("hides the previous video's URL while a different asset is loading", async () => {
+    let finishNew!: (answer: { url: string; expiresAt: null }) => void;
+    const fetchUrl = vi.fn((id: string) => id === "av1"
+      ? Promise.resolve({ url: "https://f.test/old", expiresAt: null })
+      : new Promise<{ url: string; expiresAt: null }>((resolve) => { finishNew = resolve; }));
+    const { result, rerender } = renderHook(({ id }) => usePlaybackUrl(fetchUrl, id), {
+      initialProps: { id: "av1" },
+    });
+    await flush();
+    expect(result.current).toBe("https://f.test/old");
+    rerender({ id: "av2" });
+    expect(result.current).toBeNull();
+    await act(async () => { finishNew({ url: "https://f.test/new", expiresAt: null }); });
+    expect(result.current).toBe("https://f.test/new");
+  });
+
   it("asks again shortly before the URL expires, and uses the new one", async () => {
     const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
     const answers = [
